@@ -49,4 +49,4 @@ jobs:
           version: latest
 
       - name: Test
-        run: go test -v -race ./...
+        run: make test
