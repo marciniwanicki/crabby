@@ -19,6 +19,7 @@ const (
 	colorYellow    = "\033[33m"
 	colorWhiteBold = "\033[1;37m"
 	colorWhite     = "\033[37m"
+	colorGray      = "\033[90m"
 )
 
 // Verbosity levels
@@ -191,6 +192,60 @@ func (c *Client) Shutdown(ctx context.Context) error {
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("daemon returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// History retrieves the conversation history from the daemon
+func (c *Client) History(ctx context.Context) (*api.HistoryResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/history", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("daemon returned status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var history api.HistoryResponse
+	if err := proto.Unmarshal(data, &history); err != nil {
+		return nil, err
+	}
+
+	return &history, nil
+}
+
+// PrintHistory fetches and displays the conversation history
+func (c *Client) PrintHistory(ctx context.Context) error {
+	history, err := c.History(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(history.Messages) == 0 {
+		fmt.Printf("%sNo conversation history yet.%s\n\n", colorGray, colorReset)
+		return nil
+	}
+
+	for _, msg := range history.Messages {
+		switch msg.Role {
+		case api.Role_USER:
+			fmt.Printf("%sUser:%s %s\n\n", colorYellow, colorReset, msg.Content)
+		case api.Role_ASSISTANT:
+			fmt.Printf("%sAssistant:%s %s\n\n", colorGray, colorReset, msg.Content)
+		}
 	}
 
 	return nil

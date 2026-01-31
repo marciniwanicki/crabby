@@ -26,6 +26,7 @@ type Role int32
 const (
 	Role_ASSISTANT Role = 0
 	Role_SYSTEM    Role = 1
+	Role_USER      Role = 2
 )
 
 // Enum value maps for Role.
@@ -33,10 +34,12 @@ var (
 	Role_name = map[int32]string{
 		0: "ASSISTANT",
 		1: "SYSTEM",
+		2: "USER",
 	}
 	Role_value = map[string]int32{
 		"ASSISTANT": 0,
 		"SYSTEM":    1,
+		"USER":      2,
 	}
 )
 
@@ -525,6 +528,102 @@ func (x *StatusResponse) GetVersion() string {
 	return ""
 }
 
+type HistoryMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Role          Role                   `protobuf:"varint,1,opt,name=role,proto3,enum=crabby.api.v1.Role" json:"role,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryMessage) Reset() {
+	*x = HistoryMessage{}
+	mi := &file_internal_api_messages_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryMessage) ProtoMessage() {}
+
+func (x *HistoryMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryMessage.ProtoReflect.Descriptor instead.
+func (*HistoryMessage) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *HistoryMessage) GetRole() Role {
+	if x != nil {
+		return x.Role
+	}
+	return Role_ASSISTANT
+}
+
+func (x *HistoryMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type HistoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*HistoryMessage      `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryResponse) Reset() {
+	*x = HistoryResponse{}
+	mi := &file_internal_api_messages_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryResponse) ProtoMessage() {}
+
+func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryResponse.ProtoReflect.Descriptor instead.
+func (*HistoryResponse) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *HistoryResponse) GetMessages() []*HistoryMessage {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
 var File_internal_api_messages_proto protoreflect.FileDescriptor
 
 const file_internal_api_messages_proto_rawDesc = "" +
@@ -559,11 +658,17 @@ const file_internal_api_messages_proto_rawDesc = "" +
 	"\x0eStatusResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion*!\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\"S\n" +
+	"\x0eHistoryMessage\x12'\n" +
+	"\x04role\x18\x01 \x01(\x0e2\x13.crabby.api.v1.RoleR\x04role\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"L\n" +
+	"\x0fHistoryResponse\x129\n" +
+	"\bmessages\x18\x01 \x03(\v2\x1d.crabby.api.v1.HistoryMessageR\bmessages*+\n" +
 	"\x04Role\x12\r\n" +
 	"\tASSISTANT\x10\x00\x12\n" +
 	"\n" +
-	"\x06SYSTEM\x10\x01B/Z-github.com/marciniwanicki/crabby/internal/apib\x06proto3"
+	"\x06SYSTEM\x10\x01\x12\b\n" +
+	"\x04USER\x10\x02B/Z-github.com/marciniwanicki/crabby/internal/apib\x06proto3"
 
 var (
 	file_internal_api_messages_proto_rawDescOnce sync.Once
@@ -578,27 +683,31 @@ func file_internal_api_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_api_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_internal_api_messages_proto_goTypes = []any{
-	(Role)(0),              // 0: crabby.api.v1.Role
-	(*ChatRequest)(nil),    // 1: crabby.api.v1.ChatRequest
-	(*ChatResponse)(nil),   // 2: crabby.api.v1.ChatResponse
-	(*TextChunk)(nil),      // 3: crabby.api.v1.TextChunk
-	(*ToolCall)(nil),       // 4: crabby.api.v1.ToolCall
-	(*ToolResult)(nil),     // 5: crabby.api.v1.ToolResult
-	(*StatusRequest)(nil),  // 6: crabby.api.v1.StatusRequest
-	(*StatusResponse)(nil), // 7: crabby.api.v1.StatusResponse
+	(Role)(0),               // 0: crabby.api.v1.Role
+	(*ChatRequest)(nil),     // 1: crabby.api.v1.ChatRequest
+	(*ChatResponse)(nil),    // 2: crabby.api.v1.ChatResponse
+	(*TextChunk)(nil),       // 3: crabby.api.v1.TextChunk
+	(*ToolCall)(nil),        // 4: crabby.api.v1.ToolCall
+	(*ToolResult)(nil),      // 5: crabby.api.v1.ToolResult
+	(*StatusRequest)(nil),   // 6: crabby.api.v1.StatusRequest
+	(*StatusResponse)(nil),  // 7: crabby.api.v1.StatusResponse
+	(*HistoryMessage)(nil),  // 8: crabby.api.v1.HistoryMessage
+	(*HistoryResponse)(nil), // 9: crabby.api.v1.HistoryResponse
 }
 var file_internal_api_messages_proto_depIdxs = []int32{
 	3, // 0: crabby.api.v1.ChatResponse.text:type_name -> crabby.api.v1.TextChunk
 	4, // 1: crabby.api.v1.ChatResponse.tool_call:type_name -> crabby.api.v1.ToolCall
 	5, // 2: crabby.api.v1.ChatResponse.tool_result:type_name -> crabby.api.v1.ToolResult
 	0, // 3: crabby.api.v1.TextChunk.role:type_name -> crabby.api.v1.Role
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0, // 4: crabby.api.v1.HistoryMessage.role:type_name -> crabby.api.v1.Role
+	8, // 5: crabby.api.v1.HistoryResponse.messages:type_name -> crabby.api.v1.HistoryMessage
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_internal_api_messages_proto_init() }
@@ -619,7 +728,7 @@ func file_internal_api_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_api_messages_proto_rawDesc), len(file_internal_api_messages_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

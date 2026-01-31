@@ -38,6 +38,7 @@ message ToolResult {
 enum Role {
   ASSISTANT = 0;
   SYSTEM = 1;
+  USER = 2;
 }
 
 message StatusRequest {}
@@ -46,4 +47,13 @@ message StatusResponse {
   bool healthy = 1;
   string model = 2;
   string version = 3;
+}
+
+message HistoryMessage {
+  Role role = 1;
+  string content = 2;
+}
+
+message HistoryResponse {
+  repeated HistoryMessage messages = 1;
 }

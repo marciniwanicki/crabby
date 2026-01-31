@@ -97,17 +97,20 @@ func NewAgent(llm LLMClient, registry *tools.Registry, logger zerolog.Logger, sy
 	}
 }
 
-// Run executes the agent loop with the given user message
+// Run executes the agent loop with the given user message and conversation history
 // It streams events to eventChan and returns when complete
 // Text is buffered and only streamed when it's the final answer (no tool calls)
 // Tool calls are streamed immediately
-func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Event) error {
+// Returns the updated message history
+func (a *Agent) Run(ctx context.Context, userMessage string, history []Message, eventChan chan<- Event) ([]Message, error) {
 	defer close(eventChan)
 
+	// Build messages: system prompt + history + new user message
 	messages := []Message{
 		{Role: "system", Content: a.systemPrompt},
-		{Role: "user", Content: userMessage},
 	}
+	messages = append(messages, history...)
+	messages = append(messages, Message{Role: "user", Content: userMessage})
 
 	toolDefMaps := a.registry.Definitions()
 	toolDefs := make([]any, len(toolDefMaps))
@@ -118,7 +121,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 	for i := 0; i < maxToolIterations; i++ {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
@@ -145,7 +148,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 		// Check for errors
 		select {
 		case err := <-errChan:
-			return err
+			return nil, err
 		case result := <-resultChan:
 			// If no tool calls, this is the final answer - stream buffered content
 			if len(result.ToolCalls) == 0 {
@@ -156,7 +159,9 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 						Role: RoleAssistant,
 					}
 				}
-				return nil
+				// Add final assistant message and return history (excluding system prompt)
+				messages = append(messages, Message{Role: "assistant", Content: result.Content})
+				return messages[1:], nil // Skip system prompt
 			}
 
 			// Process tool calls - intermediate text is discarded
@@ -217,5 +222,5 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 		}
 	}
 
-	return fmt.Errorf("max tool iterations (%d) exceeded", maxToolIterations)
+	return nil, fmt.Errorf("max tool iterations (%d) exceeded", maxToolIterations)
 }

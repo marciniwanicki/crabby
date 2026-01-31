@@ -15,8 +15,9 @@ import (
 
 // Handler manages WebSocket connections and message handling
 type Handler struct {
-	agent  *agent.Agent
-	logger zerolog.Logger
+	agent   *agent.Agent
+	logger  zerolog.Logger
+	history []agent.Message
 }
 
 // NewHandler creates a new handler
@@ -25,6 +26,11 @@ func NewHandler(agent *agent.Agent, logger zerolog.Logger) *Handler {
 		agent:  agent,
 		logger: logger,
 	}
+}
+
+// History returns the current conversation history
+func (h *Handler) History() []agent.Message {
+	return h.history
 }
 
 // HandleChat processes a chat WebSocket connection
@@ -69,9 +75,15 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 	ctx := context.Background()
 	eventChan := make(chan agent.Event, 100)
 
+	resultChan := make(chan []agent.Message, 1)
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- h.agent.Run(ctx, message, eventChan)
+		history, err := h.agent.Run(ctx, message, h.history, eventChan)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		resultChan <- history
 	}()
 
 	// Stream events to client
@@ -124,9 +136,12 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 		}
 	}
 
-	// Check for errors from the agent goroutine
-	if err := <-errChan; err != nil {
+	// Check for errors or get updated history
+	select {
+	case err := <-errChan:
 		return err
+	case history := <-resultChan:
+		h.history = history
 	}
 
 	// Send done signal

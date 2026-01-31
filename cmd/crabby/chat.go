@@ -101,6 +101,13 @@ func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) err
 			break
 		}
 
+		if input == "/history" {
+			if err := c.PrintHistory(ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
+			continue
+		}
+
 		if err := c.Chat(ctx, input, os.Stdout, opts); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		}

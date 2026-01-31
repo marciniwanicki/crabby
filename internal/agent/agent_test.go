@@ -68,7 +68,7 @@ func TestAgent_Run_SimpleResponse(t *testing.T) {
 
 	eventChan := make(chan Event, 10)
 
-	err := agent.Run(context.Background(), "Hi", eventChan)
+	_, err := agent.Run(context.Background(), "Hi", nil, eventChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestAgent_Run_WithToolCall(t *testing.T) {
 	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
-	err := agent.Run(context.Background(), "Call the tool", eventChan)
+	_, err := agent.Run(context.Background(), "Call the tool", nil, eventChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestAgent_Run_ToolError(t *testing.T) {
 	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
-	err := agent.Run(context.Background(), "Call the failing tool", eventChan)
+	_, err := agent.Run(context.Background(), "Call the failing tool", nil, eventChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestAgent_Run_ContextCancellation(t *testing.T) {
 
 	eventChan := make(chan Event, 10)
 
-	err := agent.Run(ctx, "Hi", eventChan)
+	_, err := agent.Run(ctx, "Hi", nil, eventChan)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled error, got: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestAgent_Run_MessagesIncludeSystemPrompt(t *testing.T) {
 	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 
 	eventChan := make(chan Event, 10)
-	_ = agent.Run(context.Background(), "User message", eventChan)
+	_, _ = agent.Run(context.Background(), "User message", nil, eventChan)
 
 	// Drain events
 	for range eventChan {
@@ -318,7 +318,7 @@ func TestAgent_Run_WithShellTool(t *testing.T) {
 	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
-	err := agent.Run(context.Background(), "Run echo", eventChan)
+	_, err := agent.Run(context.Background(), "Run echo", nil, eventChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestAgent_Run_BuffersIntermediateText(t *testing.T) {
 	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
-	err := agent.Run(context.Background(), "What is the answer?", eventChan)
+	_, err := agent.Run(context.Background(), "What is the answer?", nil, eventChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

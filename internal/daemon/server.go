@@ -103,6 +103,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/status", s.handleStatus)
 	mux.HandleFunc("/shutdown", s.handleShutdown)
+	mux.HandleFunc("/history", s.handleHistory)
 
 	// WebSocket endpoints
 	mux.HandleFunc("/ws/chat", s.handleWSChat)
@@ -195,4 +196,37 @@ func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		s.quit <- syscall.SIGTERM
 	}()
+}
+
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	history := s.handler.History()
+
+	resp := &api.HistoryResponse{
+		Messages: make([]*api.HistoryMessage, 0, len(history)),
+	}
+
+	for _, msg := range history {
+		var role api.Role
+		switch msg.Role {
+		case "user":
+			role = api.Role_USER
+		case "assistant":
+			role = api.Role_ASSISTANT
+		default:
+			continue // Skip system and tool messages
+		}
+		resp.Messages = append(resp.Messages, &api.HistoryMessage{
+			Role:    role,
+			Content: msg.Content,
+		})
+	}
+
+	data, err := proto.Marshal(resp)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	_, _ = w.Write(data)
 }
