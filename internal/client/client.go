@@ -124,7 +124,7 @@ func (s *spinner) Start() {
 				s.pausedMu.Unlock()
 			default:
 				if !paused {
-					fmt.Fprintf(s.output, "\r%s%s %s(thinking)%s", colorLightYellow, s.frames[i%len(s.frames)], colorGray, colorReset)
+					fmt.Fprintf(s.output, "\r%s%s %s(thinking…)%s", colorLightYellow, s.frames[i%len(s.frames)], colorGray, colorReset)
 					i++
 				}
 				time.Sleep(s.interval)
