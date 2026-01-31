@@ -11,8 +11,6 @@ import (
 
 const maxToolIterations = 10
 
-const systemPrompt = `You are a helpful AI assistant called Crabby. You MUST respond ONLY in English - never use any other language. Be concise and direct. When using tools, briefly state what you're doing and report results clearly.`
-
 // EventType represents the type of event
 type EventType int
 
@@ -83,17 +81,19 @@ type LLMClient interface {
 
 // Agent handles the LLM + tool execution loop
 type Agent struct {
-	llm      LLMClient
-	registry *tools.Registry
-	logger   zerolog.Logger
+	llm          LLMClient
+	registry     *tools.Registry
+	logger       zerolog.Logger
+	systemPrompt string
 }
 
-// NewAgent creates a new agent
-func NewAgent(llm LLMClient, registry *tools.Registry, logger zerolog.Logger) *Agent {
+// NewAgent creates a new agent with the given system prompt
+func NewAgent(llm LLMClient, registry *tools.Registry, logger zerolog.Logger, systemPrompt string) *Agent {
 	return &Agent{
-		llm:      llm,
-		registry: registry,
-		logger:   logger,
+		llm:          llm,
+		registry:     registry,
+		logger:       logger,
+		systemPrompt: systemPrompt,
 	}
 }
 
@@ -105,7 +105,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 	defer close(eventChan)
 
 	messages := []Message{
-		{Role: "system", Content: systemPrompt},
+		{Role: "system", Content: a.systemPrompt},
 		{Role: "user", Content: userMessage},
 	}
 

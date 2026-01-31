@@ -48,6 +48,20 @@ func NewServer(port int, ollamaURL, model string) *Server {
 		Strs("shell_allowlist", settings.Tools.Shell.Allowlist).
 		Msg("loaded settings")
 
+	// Load templates
+	templates, err := config.LoadTemplates()
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to load templates, using defaults")
+		templates = &config.Templates{
+			Identity: config.DefaultIdentityTemplate(),
+			User:     config.DefaultUserTemplate(),
+		}
+	}
+	logger.Info().Msg("loaded templates")
+
+	// Build system prompt from templates
+	systemPrompt := templates.Identity + "\n\n" + templates.User
+
 	// Create Ollama client
 	ollama := NewOllamaClient(ollamaURL, model)
 
@@ -61,8 +75,8 @@ func NewServer(port int, ollamaURL, model string) *Server {
 		logger.Info().Msg("registered shell tool")
 	}
 
-	// Create agent
-	agnt := agent.NewAgent(ollama, registry, logger)
+	// Create agent with system prompt from templates
+	agnt := agent.NewAgent(ollama, registry, logger, systemPrompt)
 
 	// Create handler
 	handler := NewHandler(agnt, logger)

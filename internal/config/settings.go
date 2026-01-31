@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
+
+	"github.com/marciniwanicki/crabby/templates"
 )
 
 // Settings represents the application settings
@@ -134,4 +138,103 @@ func (s *Settings) IsCommandAllowed(cmd string) bool {
 		}
 	}
 	return false
+}
+
+// Templates holds the loaded template content
+type Templates struct {
+	Identity string
+	User     string
+}
+
+// DefaultIdentityTemplate returns the default identity template from embedded files
+func DefaultIdentityTemplate() string {
+	content, err := templates.Identity()
+	if err != nil {
+		return "You are Crabby, a helpful personal AI assistant."
+	}
+	return content
+}
+
+// DefaultUserTemplate returns the default user template with placeholders replaced
+func DefaultUserTemplate() string {
+	content, err := templates.User()
+	if err != nil {
+		return "# User"
+	}
+	return content
+}
+
+// processUserTemplate replaces placeholders in the user template with actual values
+func processUserTemplate(content string) string {
+	replacements := map[string]string{
+		"{{USERNAME}}": os.Getenv("USER"),
+		"{{HOME}}":     os.Getenv("HOME"),
+		"{{OS}}":       getOS(),
+	}
+
+	for placeholder, value := range replacements {
+		content = strings.ReplaceAll(content, placeholder, value)
+	}
+
+	return content
+}
+
+func getOS() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "macOS"
+	case "linux":
+		return "Linux"
+	case "windows":
+		return "Windows"
+	default:
+		return runtime.GOOS
+	}
+}
+
+// LoadTemplates loads templates from ~/.crabby/identity.md and ~/.crabby/user.md
+// If files don't exist, creates them from the embedded default templates
+func LoadTemplates() (*Templates, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return nil, err
+	}
+
+	result := &Templates{}
+
+	// Load or create identity template
+	identityPath := filepath.Join(dir, "identity.md")
+	if data, err := os.ReadFile(identityPath); err == nil {
+		result.Identity = string(data)
+	} else if os.IsNotExist(err) {
+		result.Identity = DefaultIdentityTemplate()
+		if err := os.WriteFile(identityPath, []byte(result.Identity), 0600); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+
+	// Load or create user template
+	userPath := filepath.Join(dir, "user.md")
+	if data, err := os.ReadFile(userPath); err == nil {
+		result.User = processUserTemplate(string(data))
+	} else if os.IsNotExist(err) {
+		defaultUser := DefaultUserTemplate()
+		// Write the template with placeholders
+		if err := os.WriteFile(userPath, []byte(defaultUser), 0600); err != nil {
+			return nil, err
+		}
+		// Process placeholders for actual use
+		result.User = processUserTemplate(defaultUser)
+	} else {
+		return nil, err
+	}
+
+	return result, nil
 }

@@ -50,7 +50,7 @@ func TestNewAgent(t *testing.T) {
 	registry := tools.NewRegistry()
 	logger := testLogger()
 
-	agent := NewAgent(llm, registry, logger)
+	agent := NewAgent(llm, registry, logger, "You are a test assistant.")
 
 	if agent == nil {
 		t.Fatal("expected agent to be created")
@@ -64,7 +64,7 @@ func TestAgent_Run_SimpleResponse(t *testing.T) {
 		},
 	}
 	registry := tools.NewRegistry()
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 
 	eventChan := make(chan Event, 10)
 
@@ -128,7 +128,7 @@ func TestAgent_Run_WithToolCall(t *testing.T) {
 		},
 	})
 
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
 	err := agent.Run(context.Background(), "Call the tool", eventChan)
@@ -192,7 +192,7 @@ func TestAgent_Run_ToolError(t *testing.T) {
 		},
 	})
 
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
 	err := agent.Run(context.Background(), "Call the failing tool", eventChan)
@@ -228,7 +228,7 @@ func TestAgent_Run_ContextCancellation(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
@@ -249,7 +249,7 @@ func TestAgent_Run_MessagesIncludeSystemPrompt(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 
 	eventChan := make(chan Event, 10)
 	_ = agent.Run(context.Background(), "User message", eventChan)
@@ -315,7 +315,7 @@ func TestAgent_Run_WithShellTool(t *testing.T) {
 	registry := tools.NewRegistry()
 	registry.Register(tools.NewShellTool(settings))
 
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
 	err := agent.Run(context.Background(), "Run echo", eventChan)
@@ -379,7 +379,7 @@ func TestAgent_Run_BuffersIntermediateText(t *testing.T) {
 		},
 	})
 
-	agent := NewAgent(llm, registry, testLogger())
+	agent := NewAgent(llm, registry, testLogger(), "You are a test assistant.")
 	eventChan := make(chan Event, 20)
 
 	err := agent.Run(context.Background(), "What is the answer?", eventChan)
