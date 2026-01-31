@@ -1,4 +1,4 @@
-.PHONY: build proto clean install deps format lint test help
+.PHONY: build proto clean install deps format lint test ready help
 
 # Binary names
 BINARY_NAME=crabby
@@ -47,6 +47,19 @@ lint: ## Run linters
 
 test: ## Run tests
 	go test -v -race ./...
+
+ready: ## Run all checks before PR (format, proto, lint, test, build)
+	@echo "==> Formatting code..."
+	@$(MAKE) format
+	@echo "==> Generating protobuf..."
+	@$(MAKE) proto
+	@echo "==> Running linter..."
+	@$(MAKE) lint
+	@echo "==> Running tests..."
+	@$(MAKE) test
+	@echo "==> Building..."
+	@$(MAKE) build
+	@echo "==> All checks passed!"
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
