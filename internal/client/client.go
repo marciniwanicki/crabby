@@ -124,3 +124,23 @@ func (c *Client) IsRunning(ctx context.Context) bool {
 
 	return resp.StatusCode == http.StatusOK
 }
+
+// Shutdown requests the daemon to stop
+func (c *Client) Shutdown(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/shutdown", nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("daemon returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}

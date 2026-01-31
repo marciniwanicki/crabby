@@ -24,6 +24,7 @@ type Server struct {
 	handler  *Handler
 	logger   zerolog.Logger
 	upgrader websocket.Upgrader
+	quit     chan os.Signal
 }
 
 // NewServer creates a new daemon server
@@ -52,6 +53,7 @@ func (s *Server) Run() error {
 	// HTTP endpoints
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/status", s.handleStatus)
+	mux.HandleFunc("/shutdown", s.handleShutdown)
 
 	// WebSocket endpoints
 	mux.HandleFunc("/ws/chat", s.handleWSChat)
@@ -63,11 +65,11 @@ func (s *Server) Run() error {
 
 	// Graceful shutdown
 	done := make(chan bool)
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	s.quit = make(chan os.Signal, 1)
+	signal.Notify(s.quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-quit
+		<-s.quit
 		s.logger.Info().Msg("shutting down server...")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -127,4 +129,20 @@ func (s *Server) handleWSChat(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info().Str("remote", r.RemoteAddr).Msg("new chat connection")
 	s.handler.HandleChat(conn)
+}
+
+func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.logger.Info().Msg("shutdown requested via API")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("shutting down"))
+
+	// Trigger shutdown in background to allow response to be sent
+	go func() {
+		s.quit <- syscall.SIGTERM
+	}()
 }
