@@ -1,4 +1,4 @@
-# crabby
+# 🦀 crabby
 
 [![main](https://github.com/marciniwanicki/crabby/actions/workflows/main.yml/badge.svg)](https://github.com/marciniwanicki/crabby/actions/workflows/main.yml)
 
