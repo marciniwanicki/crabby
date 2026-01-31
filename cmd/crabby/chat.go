@@ -11,10 +11,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	colorReset  = "\033[0m"
+	colorOrange = "\033[38;5;208m"
+	colorGray   = "\033[90m"
+)
+
 var (
 	verbose bool
 	quiet   bool
 )
+
+const crabASCII = `
+ ██      ██
+  ▀██████▀
+   ▀▄▀▀▄▀
+  ▄██████▄
+ ▀▀ ▀▀▀▀ ▀▀
+`
 
 func chatCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -53,10 +67,25 @@ func chatCmd() *cobra.Command {
 	return cmd
 }
 
+func printBanner(c *client.Client, ctx context.Context) {
+	// Print crab ASCII art in orange
+	fmt.Print(colorOrange)
+	fmt.Print(crabASCII)
+	fmt.Print(colorReset)
+
+	// Get status for model info
+	status, err := c.Status(ctx)
+	if err == nil {
+		fmt.Printf("%sModel: %s  •  Version: %s%s\n", colorGray, status.Model, status.Version, colorReset)
+	}
+
+	// Instructions in gray
+	fmt.Printf("%sType 'exit' to leave  •  Ctrl+C to interrupt%s\n\n", colorGray, colorReset)
+}
+
 func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) error {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Crabby REPL - Type 'exit' or Ctrl+C to quit")
-	fmt.Println()
+	printBanner(c, ctx)
 
 	for {
 		fmt.Print("❯ ")
