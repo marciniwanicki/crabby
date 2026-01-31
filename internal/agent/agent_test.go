@@ -346,6 +346,89 @@ func TestAgent_Run_WithShellTool(t *testing.T) {
 	}
 }
 
+func TestAgent_Run_BuffersIntermediateText(t *testing.T) {
+	// This test verifies that intermediate text (when there are tool calls)
+	// is NOT streamed, only the final answer is streamed
+	llm := &mockLLMClient{
+		responses: []ChatResult{
+			{
+				Content: "Let me check that for you...", // This should NOT be streamed
+				ToolCalls: []ToolCall{
+					{
+						ID: "call_1",
+						Function: FunctionCall{
+							Name:      "test_tool",
+							Arguments: map[string]any{},
+						},
+					},
+				},
+				Done: false,
+			},
+			{
+				Content: "The answer is 42.", // This SHOULD be streamed
+				Done:    true,
+			},
+		},
+	}
+
+	registry := tools.NewRegistry()
+	registry.Register(&testTool{
+		name: "test_tool",
+		execFunc: func(args map[string]any) (string, error) {
+			return "tool output", nil
+		},
+	})
+
+	agent := NewAgent(llm, registry, testLogger())
+	eventChan := make(chan Event, 20)
+
+	err := agent.Run(context.Background(), "What is the answer?", eventChan)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Collect events
+	var textEvents []Event
+	var toolEvents []Event
+	for event := range eventChan {
+		switch event.Type {
+		case EventText:
+			textEvents = append(textEvents, event)
+		case EventToolCall, EventToolResult:
+			toolEvents = append(toolEvents, event)
+		}
+	}
+
+	// Should have tool events
+	if len(toolEvents) == 0 {
+		t.Error("expected tool events")
+	}
+
+	// Should only have text events from the final answer
+	if len(textEvents) == 0 {
+		t.Fatal("expected text events for final answer")
+	}
+
+	// The intermediate text should NOT appear in text events
+	for _, e := range textEvents {
+		if e.Text == "Let me check that for you..." {
+			t.Error("intermediate text should not be streamed")
+		}
+	}
+
+	// The final answer SHOULD appear
+	foundFinalAnswer := false
+	for _, e := range textEvents {
+		if e.Text == "The answer is 42." {
+			foundFinalAnswer = true
+			break
+		}
+	}
+	if !foundFinalAnswer {
+		t.Error("expected final answer to be streamed")
+	}
+}
+
 // testTool is a simple tool implementation for testing
 type testTool struct {
 	name     string

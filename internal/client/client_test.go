@@ -98,11 +98,6 @@ func TestFormatToolCall_ColorCodes(t *testing.T) {
 func TestFormatToolCall_NewLines(t *testing.T) {
 	result := formatToolCall("shell", `{"command":"date"}`)
 
-	// Should start with newline
-	if !strings.HasPrefix(result, "\n") {
-		t.Error("expected leading newline")
-	}
-
 	// Should end with double newline for spacing
 	if !strings.HasSuffix(result, "\n\n") {
 		t.Error("expected trailing double newline")

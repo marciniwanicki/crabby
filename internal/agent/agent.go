@@ -99,6 +99,8 @@ func NewAgent(llm LLMClient, registry *tools.Registry, logger zerolog.Logger) *A
 
 // Run executes the agent loop with the given user message
 // It streams events to eventChan and returns when complete
+// Text is buffered and only streamed when it's the final answer (no tool calls)
+// Tool calls are streamed immediately
 func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Event) error {
 	defer close(eventChan)
 
@@ -134,13 +136,10 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 			resultChan <- result
 		}()
 
-		// Stream tokens as text events
+		// Buffer tokens - we'll only stream them if this is the final answer
+		var bufferedTokens []string
 		for token := range tokenChan {
-			eventChan <- Event{
-				Type: EventText,
-				Text: token,
-				Role: RoleAssistant,
-			}
+			bufferedTokens = append(bufferedTokens, token)
 		}
 
 		// Check for errors
@@ -148,13 +147,23 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 		case err := <-errChan:
 			return err
 		case result := <-resultChan:
-			// If no tool calls, we're done
+			// If no tool calls, this is the final answer - stream buffered content
 			if len(result.ToolCalls) == 0 {
+				for _, token := range bufferedTokens {
+					eventChan <- Event{
+						Type: EventText,
+						Text: token,
+						Role: RoleAssistant,
+					}
+				}
 				return nil
 			}
 
-			// Process tool calls
-			a.logger.Debug().Int("count", len(result.ToolCalls)).Msg("processing tool calls")
+			// Process tool calls - intermediate text is discarded
+			a.logger.Debug().
+				Int("count", len(result.ToolCalls)).
+				Int("buffered_tokens", len(bufferedTokens)).
+				Msg("processing tool calls, discarding intermediate text")
 
 			// Add assistant message with tool calls
 			messages = append(messages, Message{
@@ -168,7 +177,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 				// Marshal arguments to JSON string
 				argsJSON, _ := json.Marshal(tc.Function.Arguments)
 
-				// Emit tool call event
+				// Emit tool call event immediately
 				eventChan <- Event{
 					Type:     EventToolCall,
 					ToolID:   tc.ID,
@@ -188,7 +197,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Ev
 					output = fmt.Sprintf("Error: %v", err)
 				}
 
-				// Emit tool result event
+				// Emit tool result event immediately
 				eventChan <- Event{
 					Type:        EventToolResult,
 					ToolID:      tc.ID,

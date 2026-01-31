@@ -205,7 +205,7 @@ func formatToolCall(name, arguments string) string {
 	var args map[string]any
 	if name == "shell" && json.Unmarshal([]byte(arguments), &args) == nil {
 		if cmd, ok := args["command"].(string); ok {
-			return fmt.Sprintf("\n%s⚡%s%s%s%s(%s%s%s)\n\n",
+			return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n\n",
 				colorYellow, colorReset,
 				colorWhiteBold, displayName, colorReset,
 				colorWhite, cmd, colorReset)
@@ -213,7 +213,7 @@ func formatToolCall(name, arguments string) string {
 	}
 
 	// Default format for other tools
-	return fmt.Sprintf("\n%s⚡%s%s%s%s(%s%s%s)\n\n",
+	return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n\n",
 		colorYellow, colorReset,
 		colorWhiteBold, displayName, colorReset,
 		colorWhite, arguments, colorReset)
