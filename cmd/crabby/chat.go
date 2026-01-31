@@ -11,6 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	colorReset = "\033[0m"
+	colorGrey  = "\033[90m"
+)
+
 func chatCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "chat [message]",
@@ -28,7 +33,10 @@ func chatCmd() *cobra.Command {
 			if len(args) > 0 {
 				// One-shot mode: send message and exit
 				message := strings.Join(args, " ")
-				return c.Chat(ctx, message, os.Stdout)
+				fmt.Print(colorGrey)
+				err := c.Chat(ctx, message, os.Stdout)
+				fmt.Print(colorReset)
+				return err
 			}
 
 			// Interactive REPL mode
@@ -43,7 +51,7 @@ func runREPL(ctx context.Context, c *client.Client) error {
 	fmt.Println()
 
 	for {
-		fmt.Print("> ")
+		fmt.Print("❯ ")
 		if !scanner.Scan() {
 			break
 		}
@@ -58,8 +66,12 @@ func runREPL(ctx context.Context, c *client.Client) error {
 			break
 		}
 
+		fmt.Print(colorGrey)
 		if err := c.Chat(ctx, input, os.Stdout); err != nil {
+			fmt.Print(colorReset)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		} else {
+			fmt.Print(colorReset)
 		}
 		fmt.Println()
 	}
