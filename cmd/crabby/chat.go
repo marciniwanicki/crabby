@@ -13,7 +13,7 @@ import (
 
 const (
 	colorReset  = "\033[0m"
-	colorOrange = "\033[38;5;208m"
+	colorOrange = "\033[38;5;215m"
 	colorGray   = "\033[90m"
 )
 
@@ -23,11 +23,9 @@ var (
 )
 
 const crabASCII = `
- ██      ██
-  ▀██████▀
-   ▀▄▀▀▄▀
-  ▄██████▄
- ▀▀ ▀▀▀▀ ▀▀
+ ▀▄  ▄▀
+ ▄████▄
+ ▀ ▀▀ ▀
 `
 
 func chatCmd() *cobra.Command {
