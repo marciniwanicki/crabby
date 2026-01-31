@@ -11,12 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	colorReset  = "\033[0m"
-	colorGrey   = "\033[90m"
-	colorYellow = "\033[33m"
-)
-
 var (
 	verbose bool
 	quiet   bool
@@ -80,12 +74,8 @@ func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) err
 			break
 		}
 
-		fmt.Print(colorGrey)
 		if err := c.Chat(ctx, input, os.Stdout, opts); err != nil {
-			fmt.Print(colorReset)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		} else {
-			fmt.Print(colorReset)
 		}
 		fmt.Println()
 	}

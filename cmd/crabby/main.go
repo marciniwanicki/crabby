@@ -40,10 +40,7 @@ For interactive chat, use: crabby chat`,
 				}
 
 				message := strings.Join(args, " ")
-				fmt.Print("\033[90m") // grey
-				err := c.Chat(ctx, message, os.Stdout, client.ChatOptions{})
-				fmt.Print("\033[0m") // reset
-				return err
+				return c.Chat(ctx, message, os.Stdout, client.ChatOptions{})
 			}
 			// No args, show help
 			return cmd.Help()
