@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/marcin/crabby/internal/api"
+	"github.com/marciniwanicki/crabby/internal/api"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 )

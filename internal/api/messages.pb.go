@@ -285,7 +285,7 @@ const file_internal_api_messages_proto_rawDesc = "" +
 	"\x0eStatusResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversionB'Z%github.com/marcin/crabby/internal/apib\x06proto3"
+	"\aversion\x18\x03 \x01(\tR\aversionB/Z-github.com/marciniwanicki/crabby/internal/apib\x06proto3"
 
 var (
 	file_internal_api_messages_proto_rawDescOnce sync.Once

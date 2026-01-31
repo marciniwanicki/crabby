@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/marcin/crabby/internal/api"
+	"github.com/marciniwanicki/crabby/internal/api"
 	"google.golang.org/protobuf/proto"
 )
 

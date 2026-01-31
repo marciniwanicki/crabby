@@ -1,4 +1,4 @@
-module github.com/marcin/crabby
+module github.com/marciniwanicki/crabby
 
 go 1.25.4
 
