@@ -9,10 +9,35 @@ message ChatRequest {
 
 message ChatResponse {
   oneof payload {
-    string token = 1;     // Streaming token
-    bool done = 2;        // Stream complete signal
-    string error = 3;     // Error message
+    TextChunk text = 1;
+    ToolCall tool_call = 2;
+    ToolResult tool_result = 3;
+    bool done = 4;
+    string error = 5;
   }
+}
+
+message TextChunk {
+  string content = 1;
+  Role role = 2;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  string arguments = 3;  // JSON string
+}
+
+message ToolResult {
+  string id = 1;
+  string name = 2;
+  string output = 3;
+  bool success = 4;
+}
+
+enum Role {
+  ASSISTANT = 0;
+  SYSTEM = 1;
 }
 
 message StatusRequest {}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/marciniwanicki/crabby/internal/agent"
 	"github.com/marciniwanicki/crabby/internal/api"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
@@ -13,14 +14,14 @@ import (
 
 // Handler manages WebSocket connections and message handling
 type Handler struct {
-	ollama *OllamaClient
+	agent  *agent.Agent
 	logger zerolog.Logger
 }
 
 // NewHandler creates a new handler
-func NewHandler(ollama *OllamaClient, logger zerolog.Logger) *Handler {
+func NewHandler(agent *agent.Agent, logger zerolog.Logger) *Handler {
 	return &Handler{
-		ollama: ollama,
+		agent:  agent,
 		logger: logger,
 	}
 }
@@ -65,24 +66,64 @@ func (h *Handler) HandleChat(conn *websocket.Conn) {
 
 func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 	ctx := context.Background()
-	tokenChan := make(chan string, 100)
+	eventChan := make(chan agent.Event, 100)
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- h.ollama.Chat(ctx, message, tokenChan)
+		errChan <- h.agent.Run(ctx, message, eventChan)
 	}()
 
-	// Stream tokens to client
-	for token := range tokenChan {
-		resp := &api.ChatResponse{
-			Payload: &api.ChatResponse_Token{Token: token},
+	// Stream events to client
+	for event := range eventChan {
+		var resp *api.ChatResponse
+
+		switch event.Type {
+		case agent.EventText:
+			role := api.Role_ASSISTANT
+			if event.Role == agent.RoleSystem {
+				role = api.Role_SYSTEM
+			}
+			resp = &api.ChatResponse{
+				Payload: &api.ChatResponse_Text{
+					Text: &api.TextChunk{
+						Content: event.Text,
+						Role:    role,
+					},
+				},
+			}
+
+		case agent.EventToolCall:
+			resp = &api.ChatResponse{
+				Payload: &api.ChatResponse_ToolCall{
+					ToolCall: &api.ToolCall{
+						Id:        event.ToolID,
+						Name:      event.ToolName,
+						Arguments: event.ToolArgs,
+					},
+				},
+			}
+
+		case agent.EventToolResult:
+			resp = &api.ChatResponse{
+				Payload: &api.ChatResponse_ToolResult{
+					ToolResult: &api.ToolResult{
+						Id:      event.ToolID,
+						Name:    event.ToolName,
+						Output:  event.ToolOutput,
+						Success: event.ToolSuccess,
+					},
+				},
+			}
 		}
-		if err := h.sendResponse(conn, resp); err != nil {
-			return err
+
+		if resp != nil {
+			if err := h.sendResponse(conn, resp); err != nil {
+				return err
+			}
 		}
 	}
 
-	// Check for errors from the chat goroutine
+	// Check for errors from the agent goroutine
 	if err := <-errChan; err != nil {
 		return err
 	}

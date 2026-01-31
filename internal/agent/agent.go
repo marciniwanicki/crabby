@@ -1,0 +1,212 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/marciniwanicki/crabby/internal/tools"
+	"github.com/rs/zerolog"
+)
+
+const maxToolIterations = 10
+
+const systemPrompt = `You are a helpful AI assistant called Crabby. You MUST respond ONLY in English - never use any other language. Be concise and direct. When using tools, briefly state what you're doing and report results clearly.`
+
+// EventType represents the type of event
+type EventType int
+
+const (
+	EventText EventType = iota
+	EventToolCall
+	EventToolResult
+)
+
+// Role represents the message role
+type Role int
+
+const (
+	RoleAssistant Role = iota
+	RoleSystem
+)
+
+// Event represents a structured event from the agent
+type Event struct {
+	Type EventType
+
+	// For EventText
+	Text string
+	Role Role
+
+	// For EventToolCall and EventToolResult
+	ToolID   string
+	ToolName string
+
+	// For EventToolCall
+	ToolArgs string // JSON string
+
+	// For EventToolResult
+	ToolOutput  string
+	ToolSuccess bool
+}
+
+// Message represents a chat message
+type Message struct {
+	Role      string
+	Content   string
+	ToolCalls []ToolCall
+}
+
+// ToolCall represents a tool call from the model
+type ToolCall struct {
+	ID       string
+	Function FunctionCall
+}
+
+// FunctionCall represents the function details in a tool call
+type FunctionCall struct {
+	Name      string
+	Arguments map[string]any
+}
+
+// ChatResult represents the result of a chat request
+type ChatResult struct {
+	Content   string
+	ToolCalls []ToolCall
+	Done      bool
+}
+
+// LLMClient is the interface for LLM communication
+type LLMClient interface {
+	ChatWithTools(ctx context.Context, messages []Message, tools []any, tokenChan chan<- string) (*ChatResult, error)
+}
+
+// Agent handles the LLM + tool execution loop
+type Agent struct {
+	llm      LLMClient
+	registry *tools.Registry
+	logger   zerolog.Logger
+}
+
+// NewAgent creates a new agent
+func NewAgent(llm LLMClient, registry *tools.Registry, logger zerolog.Logger) *Agent {
+	return &Agent{
+		llm:      llm,
+		registry: registry,
+		logger:   logger,
+	}
+}
+
+// Run executes the agent loop with the given user message
+// It streams events to eventChan and returns when complete
+func (a *Agent) Run(ctx context.Context, userMessage string, eventChan chan<- Event) error {
+	defer close(eventChan)
+
+	messages := []Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	}
+
+	toolDefMaps := a.registry.Definitions()
+	toolDefs := make([]any, len(toolDefMaps))
+	for i, def := range toolDefMaps {
+		toolDefs[i] = def
+	}
+
+	for i := 0; i < maxToolIterations; i++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Create a token channel to collect streaming tokens
+		tokenChan := make(chan string, 100)
+		resultChan := make(chan *ChatResult, 1)
+		errChan := make(chan error, 1)
+
+		go func() {
+			result, err := a.llm.ChatWithTools(ctx, messages, toolDefs, tokenChan)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			resultChan <- result
+		}()
+
+		// Stream tokens as text events
+		for token := range tokenChan {
+			eventChan <- Event{
+				Type: EventText,
+				Text: token,
+				Role: RoleAssistant,
+			}
+		}
+
+		// Check for errors
+		select {
+		case err := <-errChan:
+			return err
+		case result := <-resultChan:
+			// If no tool calls, we're done
+			if len(result.ToolCalls) == 0 {
+				return nil
+			}
+
+			// Process tool calls
+			a.logger.Debug().Int("count", len(result.ToolCalls)).Msg("processing tool calls")
+
+			// Add assistant message with tool calls
+			messages = append(messages, Message{
+				Role:      "assistant",
+				Content:   result.Content,
+				ToolCalls: result.ToolCalls,
+			})
+
+			// Execute each tool call and add results
+			for _, tc := range result.ToolCalls {
+				// Marshal arguments to JSON string
+				argsJSON, _ := json.Marshal(tc.Function.Arguments)
+
+				// Emit tool call event
+				eventChan <- Event{
+					Type:     EventToolCall,
+					ToolID:   tc.ID,
+					ToolName: tc.Function.Name,
+					ToolArgs: string(argsJSON),
+				}
+
+				a.logger.Info().
+					Str("tool", tc.Function.Name).
+					Interface("args", tc.Function.Arguments).
+					Msg("executing tool")
+
+				output, err := a.registry.Execute(tc.Function.Name, tc.Function.Arguments)
+				success := err == nil
+				if err != nil {
+					a.logger.Warn().Err(err).Str("tool", tc.Function.Name).Msg("tool execution failed")
+					output = fmt.Sprintf("Error: %v", err)
+				}
+
+				// Emit tool result event
+				eventChan <- Event{
+					Type:        EventToolResult,
+					ToolID:      tc.ID,
+					ToolName:    tc.Function.Name,
+					ToolOutput:  output,
+					ToolSuccess: success,
+				}
+
+				a.logger.Debug().Str("tool", tc.Function.Name).Str("output", output).Msg("tool result")
+
+				// Add tool result message
+				messages = append(messages, Message{
+					Role:    "tool",
+					Content: output,
+				})
+			}
+		}
+	}
+
+	return fmt.Errorf("max tool iterations (%d) exceeded", maxToolIterations)
+}

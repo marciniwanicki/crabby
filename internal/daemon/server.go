@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/marciniwanicki/crabby/internal/agent"
 	"github.com/marciniwanicki/crabby/internal/api"
+	"github.com/marciniwanicki/crabby/internal/config"
+	"github.com/marciniwanicki/crabby/internal/tools"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,6 +25,7 @@ type Server struct {
 	port     int
 	ollama   *OllamaClient
 	handler  *Handler
+	settings *config.Settings
 	logger   zerolog.Logger
 	upgrader websocket.Upgrader
 	quit     chan os.Signal
@@ -30,14 +34,45 @@ type Server struct {
 // NewServer creates a new daemon server
 func NewServer(port int, ollamaURL, model string) *Server {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	// Load settings
+	settings, err := config.Load()
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to load settings, using defaults")
+		settings = config.DefaultSettings()
+	}
+
+	// Log loaded settings
+	logger.Info().
+		Bool("shell_enabled", settings.Tools.Shell.Enabled).
+		Strs("shell_allowlist", settings.Tools.Shell.Allowlist).
+		Msg("loaded settings")
+
+	// Create Ollama client
 	ollama := NewOllamaClient(ollamaURL, model)
-	handler := NewHandler(ollama, logger)
+
+	// Create tool registry
+	registry := tools.NewRegistry()
+
+	// Register shell tool if enabled
+	if settings.Tools.Shell.Enabled {
+		shellTool := tools.NewShellTool(settings)
+		registry.Register(shellTool)
+		logger.Info().Msg("registered shell tool")
+	}
+
+	// Create agent
+	agnt := agent.NewAgent(ollama, registry, logger)
+
+	// Create handler
+	handler := NewHandler(agnt, logger)
 
 	return &Server{
-		port:    port,
-		ollama:  ollama,
-		handler: handler,
-		logger:  logger,
+		port:     port,
+		ollama:   ollama,
+		handler:  handler,
+		settings: settings,
+		logger:   logger,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Allow local connections

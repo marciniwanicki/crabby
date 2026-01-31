@@ -11,6 +11,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Verbosity levels
+type Verbosity int
+
+const (
+	VerbosityNormal  Verbosity = iota // Show text + minimal tool info
+	VerbosityQuiet                    // Only show assistant text
+	VerbosityVerbose                  // Show everything including tool details
+)
+
 // Client handles communication with the daemon
 type Client struct {
 	baseURL string
@@ -25,8 +34,13 @@ func NewClient(port int) *Client {
 	}
 }
 
+// ChatOptions configures chat behavior
+type ChatOptions struct {
+	Verbosity Verbosity
+}
+
 // Chat sends a message and streams the response to the provided writer
-func (c *Client) Chat(ctx context.Context, message string, output io.Writer) error {
+func (c *Client) Chat(ctx context.Context, message string, output io.Writer, opts ChatOptions) error {
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, c.wsURL+"/ws/chat", nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to daemon: %w", err)
@@ -68,11 +82,38 @@ func (c *Client) Chat(ctx context.Context, message string, output io.Writer) err
 		}
 
 		switch payload := resp.Payload.(type) {
-		case *api.ChatResponse_Token:
-			fmt.Fprint(output, payload.Token)
+		case *api.ChatResponse_Text:
+			// Always show assistant text
+			if payload.Text.Role == api.Role_ASSISTANT {
+				fmt.Fprint(output, payload.Text.Content)
+			} else if opts.Verbosity == VerbosityVerbose {
+				// Show system messages only in verbose mode
+				fmt.Fprint(output, payload.Text.Content)
+			}
+
+		case *api.ChatResponse_ToolCall:
+			if opts.Verbosity != VerbosityQuiet {
+				fmt.Fprintf(output, "\n⚡ %s(%s)\n", payload.ToolCall.Name, payload.ToolCall.Arguments)
+			}
+
+		case *api.ChatResponse_ToolResult:
+			if opts.Verbosity == VerbosityVerbose {
+				status := "✓"
+				if !payload.ToolResult.Success {
+					status = "✗"
+				}
+				// Truncate long output
+				out := payload.ToolResult.Output
+				if len(out) > 200 {
+					out = out[:200] + "..."
+				}
+				fmt.Fprintf(output, "%s %s\n", status, out)
+			}
+
 		case *api.ChatResponse_Done:
 			fmt.Fprintln(output)
 			return nil
+
 		case *api.ChatResponse_Error:
 			return fmt.Errorf("server error: %s", payload.Error)
 		}

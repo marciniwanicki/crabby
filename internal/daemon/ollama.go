@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/marciniwanicki/crabby/internal/agent"
 )
 
 // OllamaClient handles communication with the Ollama API
@@ -20,13 +22,28 @@ type OllamaClient struct {
 type OllamaRequest struct {
 	Model    string          `json:"model"`
 	Messages []OllamaMessage `json:"messages"`
+	Tools    []any           `json:"tools,omitempty"`
 	Stream   bool            `json:"stream"`
 }
 
 // OllamaMessage represents a message in the Ollama chat format
 type OllamaMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []OllamaToolCall `json:"tool_calls,omitempty"`
+}
+
+// OllamaToolCall represents a tool call from the model
+type OllamaToolCall struct {
+	ID       string             `json:"id,omitempty"`
+	Function OllamaFunctionCall `json:"function"`
+}
+
+// OllamaFunctionCall represents the function details in a tool call
+type OllamaFunctionCall struct {
+	Index     int            `json:"index,omitempty"`
+	Name      string         `json:"name"`
+	Arguments map[string]any `json:"arguments"`
 }
 
 // OllamaResponse represents a streaming response from Ollama
@@ -116,6 +133,122 @@ func (c *OllamaClient) Chat(ctx context.Context, message string, tokenChan chan<
 	}
 
 	return nil
+}
+
+// ChatWithTools sends messages with tools to Ollama and streams the response
+// Implements agent.LLMClient interface
+func (c *OllamaClient) ChatWithTools(ctx context.Context, messages []agent.Message, tools []any, tokenChan chan<- string) (*agent.ChatResult, error) {
+	// Close the token channel when done
+	if tokenChan != nil {
+		defer close(tokenChan)
+	}
+	// Convert agent messages to Ollama messages
+	ollamaMessages := make([]OllamaMessage, len(messages))
+	for i, msg := range messages {
+		ollamaMessages[i] = OllamaMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+		// Convert tool calls if present
+		if len(msg.ToolCalls) > 0 {
+			ollamaMessages[i].ToolCalls = make([]OllamaToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				ollamaMessages[i].ToolCalls[j] = OllamaToolCall{
+					Function: OllamaFunctionCall{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
+		}
+	}
+
+	req := OllamaRequest{
+		Model:    c.model,
+		Messages: ollamaMessages,
+		Tools:    tools,
+		Stream:   true,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/chat", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama returned status %d", resp.StatusCode)
+	}
+
+	result := &agent.ChatResult{}
+	var contentBuilder bytes.Buffer
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var ollamaResp OllamaResponse
+		if err := json.Unmarshal(line, &ollamaResp); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		}
+
+		if ollamaResp.Error != "" {
+			return nil, fmt.Errorf("ollama error: %s", ollamaResp.Error)
+		}
+
+		// Accumulate content
+		if ollamaResp.Message.Content != "" {
+			contentBuilder.WriteString(ollamaResp.Message.Content)
+			if tokenChan != nil {
+				tokenChan <- ollamaResp.Message.Content
+			}
+		}
+
+		// Collect tool calls and convert to agent format
+		if len(ollamaResp.Message.ToolCalls) > 0 {
+			for _, tc := range ollamaResp.Message.ToolCalls {
+				result.ToolCalls = append(result.ToolCalls, agent.ToolCall{
+					ID: tc.ID,
+					Function: agent.FunctionCall{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				})
+			}
+		}
+
+		if ollamaResp.Done {
+			result.Done = true
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading response: %w", err)
+	}
+
+	result.Content = contentBuilder.String()
+	return result, nil
 }
 
 // Health checks if Ollama is healthy and the model is available

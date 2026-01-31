@@ -12,18 +12,36 @@ import (
 )
 
 const (
-	colorReset = "\033[0m"
-	colorGrey  = "\033[90m"
+	colorReset  = "\033[0m"
+	colorGrey   = "\033[90m"
+	colorYellow = "\033[33m"
+)
+
+var (
+	verbose bool
+	quiet   bool
 )
 
 func chatCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "chat [message]",
 		Short: "Send a message or start interactive chat",
 		Long:  "Send a single message to the AI, or start an interactive REPL mode if no message is provided.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client.NewClient(port)
 			ctx := context.Background()
+
+			// Determine verbosity
+			verbosity := client.VerbosityNormal
+			if quiet {
+				verbosity = client.VerbosityQuiet
+			} else if verbose {
+				verbosity = client.VerbosityVerbose
+			}
+
+			opts := client.ChatOptions{
+				Verbosity: verbosity,
+			}
 
 			// Check if daemon is running
 			if !c.IsRunning(ctx) {
@@ -34,18 +52,23 @@ func chatCmd() *cobra.Command {
 				// One-shot mode: send message and exit
 				message := strings.Join(args, " ")
 				fmt.Print(colorGrey)
-				err := c.Chat(ctx, message, os.Stdout)
+				err := c.Chat(ctx, message, os.Stdout, opts)
 				fmt.Print(colorReset)
 				return err
 			}
 
 			// Interactive REPL mode
-			return runREPL(ctx, c)
+			return runREPL(ctx, c, opts)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show tool call details and results")
+	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Only show assistant responses (hide tool info)")
+
+	return cmd
 }
 
-func runREPL(ctx context.Context, c *client.Client) error {
+func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Crabby REPL - Type 'exit' or Ctrl+C to quit")
 	fmt.Println()
@@ -67,7 +90,7 @@ func runREPL(ctx context.Context, c *client.Client) error {
 		}
 
 		fmt.Print(colorGrey)
-		if err := c.Chat(ctx, input, os.Stdout); err != nil {
+		if err := c.Chat(ctx, input, os.Stdout, opts); err != nil {
 			fmt.Print(colorReset)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		} else {
