@@ -1,0 +1,24 @@
+syntax = "proto3";
+package crabby.api.v1;
+option go_package = "github.com/marcin/crabby/internal/api";
+
+message ChatRequest {
+  string message = 1;
+  string session_id = 2;  // Reserved for future use
+}
+
+message ChatResponse {
+  oneof payload {
+    string token = 1;     // Streaming token
+    bool done = 2;        // Stream complete signal
+    string error = 3;     // Error message
+  }
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+  bool healthy = 1;
+  string model = 2;
+  string version = 3;
+}
