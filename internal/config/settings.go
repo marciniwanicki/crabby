@@ -18,6 +18,15 @@ type Settings struct {
 // ToolsSettings contains tool-related settings
 type ToolsSettings struct {
 	Shell ShellSettings `json:"shell"`
+	Write WriteSettings `json:"write"`
+}
+
+// WriteSettings contains write tool settings
+type WriteSettings struct {
+	Enabled      bool     `json:"enabled"`
+	AllowedPaths []string `json:"allowed_paths"` // Paths where writing is allowed (supports ~)
+	BlockedPaths []string `json:"blocked_paths"` // Paths that are always blocked
+	MaxFileSize  int64    `json:"max_file_size"` // Maximum file size in bytes (0 = unlimited)
 }
 
 // ShellSettings contains shell tool settings
@@ -46,6 +55,12 @@ func DefaultSettings() *Settings {
 					"hostname",
 					"uptime",
 				},
+			},
+			Write: WriteSettings{
+				Enabled:      true,
+				AllowedPaths: []string{"~", "/tmp"},
+				BlockedPaths: []string{"~/.ssh", "~/.gnupg", "~/.aws", "~/.crabby/settings.json"},
+				MaxFileSize:  10 * 1024 * 1024, // 10MB default
 			},
 		},
 	}
@@ -138,6 +153,64 @@ func (s *Settings) IsCommandAllowed(cmd string) bool {
 		}
 	}
 	return false
+}
+
+// ExpandPath expands ~ to the user's home directory
+func ExpandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, path[2:])
+		}
+	} else if path == "~" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return home
+		}
+	}
+	return path
+}
+
+// IsWritePathAllowed checks if a path is allowed for writing
+func (s *Settings) IsWritePathAllowed(targetPath string) (bool, string) {
+	if !s.Tools.Write.Enabled {
+		return false, "write tool is disabled"
+	}
+
+	// Clean and resolve the target path
+	expandedTarget := ExpandPath(targetPath)
+	absTarget, err := filepath.Abs(expandedTarget)
+	if err != nil {
+		return false, "invalid path"
+	}
+
+	// Check blocked paths first (takes precedence)
+	for _, blocked := range s.Tools.Write.BlockedPaths {
+		expandedBlocked := ExpandPath(blocked)
+		absBlocked, err := filepath.Abs(expandedBlocked)
+		if err != nil {
+			continue
+		}
+		// Check if target is the blocked path or inside it
+		if absTarget == absBlocked || strings.HasPrefix(absTarget, absBlocked+string(filepath.Separator)) {
+			return false, "path is blocked: " + blocked
+		}
+	}
+
+	// Check if path is within allowed paths
+	for _, allowed := range s.Tools.Write.AllowedPaths {
+		expandedAllowed := ExpandPath(allowed)
+		absAllowed, err := filepath.Abs(expandedAllowed)
+		if err != nil {
+			continue
+		}
+		// Check if target is the allowed path or inside it
+		if absTarget == absAllowed || strings.HasPrefix(absTarget, absAllowed+string(filepath.Separator)) {
+			return true, ""
+		}
+	}
+
+	return false, "path not in allowed paths"
 }
 
 // Templates holds the loaded template content

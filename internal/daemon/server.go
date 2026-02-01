@@ -76,6 +76,13 @@ func NewServer(port int, ollamaURL, model string) *Server {
 		logger.Info().Msg("registered shell tool")
 	}
 
+	// Register write tool if enabled
+	if settings.Tools.Write.Enabled {
+		writeTool := tools.NewWriteTool(settings)
+		registry.Register(writeTool)
+		logger.Info().Msg("registered write tool")
+	}
+
 	// Create agent with system prompt from templates
 	agnt := agent.NewAgent(ollama, registry, logger, systemPrompt)
 

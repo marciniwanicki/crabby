@@ -40,6 +40,14 @@ linters:
       - linters: [gosec]
         path: "internal/config/settings.go"
         text: "G304"
+      # Write tool intentionally writes to files from validated paths
+      - linters: [gosec]
+        path: "internal/tools/write.go"
+        text: "G304"
+      # Write tool tests read files to verify content
+      - linters: [gosec]
+        path: "internal/tools/write_test.go"
+        text: "G304"
       # WebSocket dial returns http.Response that doesn't need closing
       - linters: [bodyclose]
         path: "internal/client/client.go"
