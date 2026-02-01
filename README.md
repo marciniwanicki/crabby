@@ -2,7 +2,9 @@
 
 [![main](https://github.com/marciniwanicki/craby/actions/workflows/main.yml/badge.svg)](https://github.com/marciniwanicki/craby/actions/workflows/main.yml)
 
-An open-source personal AI assistant designed for experimental learning and daily utility.
+*A portmanteau of "crabby" (grumpy, irritable - because local LLMs can be stubborn) and "crappy" (not great - let's be honest about expectations).*
+
+An open-source personal AI assistant designed for experimental learning and daily utility. The goal is to run fully locally on moderate hardware.
 
 ## Architecture
 
