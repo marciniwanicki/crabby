@@ -455,6 +455,81 @@ func (c *Client) PrintHistory(ctx context.Context) error {
 	return nil
 }
 
+// ExecuteTool runs a tool directly with the given arguments
+func (c *Client) ExecuteTool(ctx context.Context, name string, args map[string]any) (*api.ToolRunResponse, error) {
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal arguments: %w", err)
+	}
+
+	reqBody := &api.ToolRunRequest{
+		Name:      name,
+		Arguments: string(argsJSON),
+	}
+	data, err := proto.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/tool/run", strings.NewReader(string(data)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-protobuf")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("daemon returned status %d", resp.StatusCode)
+	}
+
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var toolResp api.ToolRunResponse
+	if err := proto.Unmarshal(respData, &toolResp); err != nil {
+		return nil, err
+	}
+
+	return &toolResp, nil
+}
+
+// ListTools returns all registered tools
+func (c *Client) ListTools(ctx context.Context) (*api.ToolListResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/tool/list", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("daemon returned status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var toolList api.ToolListResponse
+	if err := proto.Unmarshal(data, &toolList); err != nil {
+		return nil, err
+	}
+
+	return &toolList, nil
+}
+
 // formatShellCommand formats a shell command for display
 func formatShellCommand(command string, isDiscovery bool) string {
 	prefix := "$ "
@@ -467,8 +542,8 @@ func formatShellCommand(command string, isDiscovery bool) string {
 
 // formatToolCall formats a tool call for display
 func formatToolCall(name, arguments string) string {
-	// Capitalize tool name
-	displayName := strings.ToUpper(name[:1]) + name[1:]
+	// Format tool name: replace underscores with spaces and capitalize each word
+	displayName := formatToolName(name)
 
 	// Parse arguments to extract relevant info for shell tool
 	var args map[string]any
@@ -486,6 +561,21 @@ func formatToolCall(name, arguments string) string {
 		colorLightYellow, colorReset,
 		colorWhiteBold, displayName, colorReset,
 		colorWhite, arguments, colorReset)
+}
+
+// formatToolName converts a tool name like "get_command_schema" to "Get Command Schema"
+func formatToolName(name string) string {
+	// Replace underscores with spaces
+	words := strings.Split(name, "_")
+
+	// Capitalize each word
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(word[:1]) + word[1:]
+		}
+	}
+
+	return strings.Join(words, " ")
 }
 
 // markdownRenderer handles glamour-based markdown rendering

@@ -103,14 +103,12 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 		Context: h.context,
 	}
 
-	// Set user request and command observer on shell tool
+	// Set command observer on shell tool
 	if h.shellTool != nil {
-		h.shellTool.SetUserRequest(message)
-		h.shellTool.SetCommandObserver(func(command string, isDiscovery bool) {
+		h.shellTool.SetCommandObserver(func(command string) {
 			eventChan <- agent.Event{
 				Type:         agent.EventShellCommand,
 				ShellCommand: command,
-				IsDiscovery:  isDiscovery,
 			}
 		})
 	}

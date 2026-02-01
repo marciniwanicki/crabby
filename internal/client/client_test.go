@@ -50,14 +50,34 @@ func TestFormatToolCall_OtherTool(t *testing.T) {
 		t.Error("expected lightning bolt icon")
 	}
 
-	// Should contain capitalized tool name
-	if !strings.Contains(result, "Other_tool") {
-		t.Error("expected capitalized tool name")
+	// Should contain formatted tool name (underscores replaced with spaces, title case)
+	if !strings.Contains(result, "Other Tool") {
+		t.Error("expected formatted tool name 'Other Tool'")
 	}
 
 	// Should contain raw arguments for non-shell tools
 	if !strings.Contains(result, `{"param":"value"}`) {
 		t.Error("expected raw JSON arguments for non-shell tool")
+	}
+}
+
+func TestFormatToolName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"shell", "Shell"},
+		{"get_command_schema", "Get Command Schema"},
+		{"list_available_commands", "List Available Commands"},
+		{"other_tool", "Other Tool"},
+		{"simple", "Simple"},
+	}
+
+	for _, tt := range tests {
+		result := formatToolName(tt.input)
+		if result != tt.expected {
+			t.Errorf("formatToolName(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
 	}
 }
 

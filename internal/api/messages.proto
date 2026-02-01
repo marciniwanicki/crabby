@@ -71,3 +71,24 @@ message ContextRequest {
 message ContextResponse {
   string context = 1;
 }
+
+// Tool execution request/response
+message ToolRunRequest {
+  string name = 1;
+  string arguments = 2;  // JSON string of key-value pairs
+}
+
+message ToolRunResponse {
+  string output = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message ToolListResponse {
+  repeated ToolInfo tools = 1;
+}
+
+message ToolInfo {
+  string name = 1;
+  string description = 2;
+}

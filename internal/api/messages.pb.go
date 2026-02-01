@@ -781,6 +781,215 @@ func (x *ContextResponse) GetContext() string {
 	return ""
 }
 
+// Tool execution request/response
+type ToolRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Arguments     string                 `protobuf:"bytes,2,opt,name=arguments,proto3" json:"arguments,omitempty"` // JSON string of key-value pairs
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolRunRequest) Reset() {
+	*x = ToolRunRequest{}
+	mi := &file_internal_api_messages_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolRunRequest) ProtoMessage() {}
+
+func (x *ToolRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolRunRequest.ProtoReflect.Descriptor instead.
+func (*ToolRunRequest) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ToolRunRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolRunRequest) GetArguments() string {
+	if x != nil {
+		return x.Arguments
+	}
+	return ""
+}
+
+type ToolRunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Output        string                 `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolRunResponse) Reset() {
+	*x = ToolRunResponse{}
+	mi := &file_internal_api_messages_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolRunResponse) ProtoMessage() {}
+
+func (x *ToolRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolRunResponse.ProtoReflect.Descriptor instead.
+func (*ToolRunResponse) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ToolRunResponse) GetOutput() string {
+	if x != nil {
+		return x.Output
+	}
+	return ""
+}
+
+func (x *ToolRunResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ToolRunResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type ToolListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tools         []*ToolInfo            `protobuf:"bytes,1,rep,name=tools,proto3" json:"tools,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolListResponse) Reset() {
+	*x = ToolListResponse{}
+	mi := &file_internal_api_messages_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolListResponse) ProtoMessage() {}
+
+func (x *ToolListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolListResponse.ProtoReflect.Descriptor instead.
+func (*ToolListResponse) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ToolListResponse) GetTools() []*ToolInfo {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
+type ToolInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolInfo) Reset() {
+	*x = ToolInfo{}
+	mi := &file_internal_api_messages_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolInfo) ProtoMessage() {}
+
+func (x *ToolInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolInfo.ProtoReflect.Descriptor instead.
+func (*ToolInfo) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ToolInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolInfo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 var File_internal_api_messages_proto protoreflect.FileDescriptor
 
 const file_internal_api_messages_proto_rawDesc = "" +
@@ -828,7 +1037,19 @@ const file_internal_api_messages_proto_rawDesc = "" +
 	"\x0eContextRequest\x12\x18\n" +
 	"\acontext\x18\x01 \x01(\tR\acontext\"+\n" +
 	"\x0fContextResponse\x12\x18\n" +
-	"\acontext\x18\x01 \x01(\tR\acontext*+\n" +
+	"\acontext\x18\x01 \x01(\tR\acontext\"B\n" +
+	"\x0eToolRunRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\targuments\x18\x02 \x01(\tR\targuments\"Y\n" +
+	"\x0fToolRunResponse\x12\x16\n" +
+	"\x06output\x18\x01 \x01(\tR\x06output\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"A\n" +
+	"\x10ToolListResponse\x12-\n" +
+	"\x05tools\x18\x01 \x03(\v2\x17.crabby.api.v1.ToolInfoR\x05tools\"@\n" +
+	"\bToolInfo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription*+\n" +
 	"\x04Role\x12\r\n" +
 	"\tASSISTANT\x10\x00\x12\n" +
 	"\n" +
@@ -848,35 +1069,40 @@ func file_internal_api_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_api_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_internal_api_messages_proto_goTypes = []any{
-	(Role)(0),               // 0: crabby.api.v1.Role
-	(*ChatRequest)(nil),     // 1: crabby.api.v1.ChatRequest
-	(*ChatResponse)(nil),    // 2: crabby.api.v1.ChatResponse
-	(*ShellCommand)(nil),    // 3: crabby.api.v1.ShellCommand
-	(*TextChunk)(nil),       // 4: crabby.api.v1.TextChunk
-	(*ToolCall)(nil),        // 5: crabby.api.v1.ToolCall
-	(*ToolResult)(nil),      // 6: crabby.api.v1.ToolResult
-	(*StatusRequest)(nil),   // 7: crabby.api.v1.StatusRequest
-	(*StatusResponse)(nil),  // 8: crabby.api.v1.StatusResponse
-	(*HistoryMessage)(nil),  // 9: crabby.api.v1.HistoryMessage
-	(*HistoryResponse)(nil), // 10: crabby.api.v1.HistoryResponse
-	(*ContextRequest)(nil),  // 11: crabby.api.v1.ContextRequest
-	(*ContextResponse)(nil), // 12: crabby.api.v1.ContextResponse
+	(Role)(0),                // 0: crabby.api.v1.Role
+	(*ChatRequest)(nil),      // 1: crabby.api.v1.ChatRequest
+	(*ChatResponse)(nil),     // 2: crabby.api.v1.ChatResponse
+	(*ShellCommand)(nil),     // 3: crabby.api.v1.ShellCommand
+	(*TextChunk)(nil),        // 4: crabby.api.v1.TextChunk
+	(*ToolCall)(nil),         // 5: crabby.api.v1.ToolCall
+	(*ToolResult)(nil),       // 6: crabby.api.v1.ToolResult
+	(*StatusRequest)(nil),    // 7: crabby.api.v1.StatusRequest
+	(*StatusResponse)(nil),   // 8: crabby.api.v1.StatusResponse
+	(*HistoryMessage)(nil),   // 9: crabby.api.v1.HistoryMessage
+	(*HistoryResponse)(nil),  // 10: crabby.api.v1.HistoryResponse
+	(*ContextRequest)(nil),   // 11: crabby.api.v1.ContextRequest
+	(*ContextResponse)(nil),  // 12: crabby.api.v1.ContextResponse
+	(*ToolRunRequest)(nil),   // 13: crabby.api.v1.ToolRunRequest
+	(*ToolRunResponse)(nil),  // 14: crabby.api.v1.ToolRunResponse
+	(*ToolListResponse)(nil), // 15: crabby.api.v1.ToolListResponse
+	(*ToolInfo)(nil),         // 16: crabby.api.v1.ToolInfo
 }
 var file_internal_api_messages_proto_depIdxs = []int32{
-	4, // 0: crabby.api.v1.ChatResponse.text:type_name -> crabby.api.v1.TextChunk
-	5, // 1: crabby.api.v1.ChatResponse.tool_call:type_name -> crabby.api.v1.ToolCall
-	6, // 2: crabby.api.v1.ChatResponse.tool_result:type_name -> crabby.api.v1.ToolResult
-	3, // 3: crabby.api.v1.ChatResponse.shell_command:type_name -> crabby.api.v1.ShellCommand
-	0, // 4: crabby.api.v1.TextChunk.role:type_name -> crabby.api.v1.Role
-	0, // 5: crabby.api.v1.HistoryMessage.role:type_name -> crabby.api.v1.Role
-	9, // 6: crabby.api.v1.HistoryResponse.messages:type_name -> crabby.api.v1.HistoryMessage
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	4,  // 0: crabby.api.v1.ChatResponse.text:type_name -> crabby.api.v1.TextChunk
+	5,  // 1: crabby.api.v1.ChatResponse.tool_call:type_name -> crabby.api.v1.ToolCall
+	6,  // 2: crabby.api.v1.ChatResponse.tool_result:type_name -> crabby.api.v1.ToolResult
+	3,  // 3: crabby.api.v1.ChatResponse.shell_command:type_name -> crabby.api.v1.ShellCommand
+	0,  // 4: crabby.api.v1.TextChunk.role:type_name -> crabby.api.v1.Role
+	0,  // 5: crabby.api.v1.HistoryMessage.role:type_name -> crabby.api.v1.Role
+	9,  // 6: crabby.api.v1.HistoryResponse.messages:type_name -> crabby.api.v1.HistoryMessage
+	16, // 7: crabby.api.v1.ToolListResponse.tools:type_name -> crabby.api.v1.ToolInfo
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_internal_api_messages_proto_init() }
@@ -898,7 +1124,7 @@ func file_internal_api_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_api_messages_proto_rawDesc), len(file_internal_api_messages_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -31,9 +31,10 @@ type ToolEnv struct {
 
 // ToolAccess defines how to access/invoke the tool
 type ToolAccess struct {
-	Type    string `yaml:"type"`    // "shell", "api", "mcp" (future)
-	Command string `yaml:"command"` // base command for shell type
-	WorkDir string `yaml:"workdir,omitempty"`
+	Type    string `yaml:"type"`              // "shell", "api", "mcp" (future)
+	Command string `yaml:"command"`           // base command for shell type
+	WorkDir string `yaml:"workdir,omitempty"` // working directory for shell commands
+	Details string `yaml:"details,omitempty"` // additional instructions for the LLM about how to use this tool
 }
 
 // ToolCheck defines how to verify the tool is available
@@ -181,6 +182,10 @@ func (t *ExternalTool) GenerateSystemPrompt() string {
 
 	if t.WhenToUse != "" {
 		prompt += fmt.Sprintf("**When to use:** %s\n\n", t.WhenToUse)
+	}
+
+	if t.Access.Details != "" {
+		prompt += fmt.Sprintf("**Important:** %s\n\n", t.Access.Details)
 	}
 
 	if len(t.Subcommands) > 0 {

@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,7 @@ type Server struct {
 	port      int
 	ollama    *OllamaClient
 	handler   *Handler
+	registry  *tools.Registry
 	settings  *config.Settings
 	logger    zerolog.Logger
 	logCloser io.Closer
@@ -113,17 +115,31 @@ func NewServer(port int, ollamaURL, model string) *Server {
 	// Create tool registry
 	registry := tools.NewRegistry()
 
+	// Create schema cache for dynamic tool discovery
+	schemaCache, err := config.NewSchemaCache()
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to create schema cache")
+	}
+
+	// Register discovery tools (always available)
+	listCmdTool := tools.NewListCommandsTool(settings, externalTools, schemaCache)
+	registry.Register(listCmdTool)
+	logger.Info().Msg("registered list_available_commands tool")
+
+	getSchemaTool := tools.NewGetCommandSchemaTool(settings, schemaCache, ollama)
+	registry.Register(getSchemaTool)
+	logger.Info().Msg("registered get_command_schema tool")
+
 	// Register shell tool if enabled
 	var shellTool *tools.ShellTool
 	if settings.Tools.Shell.Enabled {
 		if len(externalTools) > 0 {
-			// Use LLM-enabled shell tool for smart discovery
-			shellTool = tools.NewShellToolWithLLM(settings, externalTools, ollama)
+			shellTool = tools.NewShellToolWithExternalTools(settings, externalTools)
 		} else {
 			shellTool = tools.NewShellTool(settings)
 		}
 		registry.Register(shellTool)
-		logger.Info().Msg("registered shell tool with LLM support")
+		logger.Info().Msg("registered shell tool")
 	}
 
 	// Register write tool if enabled
@@ -151,6 +167,7 @@ func NewServer(port int, ollamaURL, model string) *Server {
 		port:      port,
 		ollama:    ollama,
 		handler:   handler,
+		registry:  registry,
 		settings:  settings,
 		logger:    logger,
 		logCloser: logCloser,
@@ -172,6 +189,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/shutdown", s.handleShutdown)
 	mux.HandleFunc("/history", s.handleHistory)
 	mux.HandleFunc("/context", s.handleContext)
+	mux.HandleFunc("/tool/run", s.handleToolRun)
+	mux.HandleFunc("/tool/list", s.handleToolList)
 
 	// WebSocket endpoints
 	mux.HandleFunc("/ws/chat", s.handleWSChat)
@@ -331,6 +350,95 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	data, err := proto.Marshal(resp)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	_, _ = w.Write(data)
+}
+
+func (s *Server) handleToolRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	var req api.ToolRunRequest
+	if err := proto.Unmarshal(data, &req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	s.logger.Info().Str("tool", req.Name).Str("args", req.Arguments).Msg("executing tool directly")
+
+	// Parse arguments from JSON
+	var args map[string]any
+	if req.Arguments != "" {
+		if err := json.Unmarshal([]byte(req.Arguments), &args); err != nil {
+			resp := &api.ToolRunResponse{
+				Success: false,
+				Error:   fmt.Sprintf("invalid arguments JSON: %v", err),
+			}
+			s.sendToolResponse(w, resp)
+			return
+		}
+	} else {
+		args = make(map[string]any)
+	}
+
+	// Execute the tool
+	output, err := s.registry.Execute(req.Name, args)
+
+	resp := &api.ToolRunResponse{
+		Output:  output,
+		Success: err == nil,
+	}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+
+	s.sendToolResponse(w, resp)
+}
+
+func (s *Server) handleToolList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	toolList := s.registry.List()
+
+	resp := &api.ToolListResponse{
+		Tools: make([]*api.ToolInfo, 0, len(toolList)),
+	}
+
+	for _, t := range toolList {
+		resp.Tools = append(resp.Tools, &api.ToolInfo{
+			Name:        t.Name(),
+			Description: t.Description(),
+		})
+	}
+
+	respData, err := proto.Marshal(resp)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	_, _ = w.Write(respData)
+}
+
+func (s *Server) sendToolResponse(w http.ResponseWriter, resp *api.ToolRunResponse) {
 	data, err := proto.Marshal(resp)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

@@ -70,6 +70,7 @@ func NewOllamaClient(baseURL, model string, llmCallLogger *config.LLMCallLogger)
 
 // Chat sends a message to Ollama and streams the response
 func (c *OllamaClient) Chat(ctx context.Context, message string, tokenChan chan<- string) error {
+	startTime := time.Now()
 	defer close(tokenChan)
 
 	req := OllamaRequest{
@@ -101,6 +102,7 @@ func (c *OllamaClient) Chat(ctx context.Context, message string, tokenChan chan<
 		return fmt.Errorf("ollama returned status %d", resp.StatusCode)
 	}
 
+	var contentBuilder bytes.Buffer
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		select {
@@ -124,6 +126,7 @@ func (c *OllamaClient) Chat(ctx context.Context, message string, tokenChan chan<
 		}
 
 		if ollamaResp.Message.Content != "" {
+			contentBuilder.WriteString(ollamaResp.Message.Content)
 			tokenChan <- ollamaResp.Message.Content
 		}
 
@@ -135,6 +138,12 @@ func (c *OllamaClient) Chat(ctx context.Context, message string, tokenChan chan<
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading response: %w", err)
 	}
+
+	// Log the LLM call
+	agentMessages := []agent.Message{
+		{Role: "user", Content: message},
+	}
+	c.logCall("chat", agentMessages, nil, &agent.ChatResult{Content: contentBuilder.String()}, "", startTime)
 
 	return nil
 }

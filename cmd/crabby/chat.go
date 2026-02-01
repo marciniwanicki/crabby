@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -128,6 +129,8 @@ func printChatHelp() {
 	fmt.Printf("  %s/exit%s        Exit the chat\n", colorLightYellow, colorReset)
 	fmt.Printf("  %s/terminate%s   Stop the daemon and exit\n", colorLightYellow, colorReset)
 	fmt.Printf("  %s/tools%s       List available external tools\n", colorLightYellow, colorReset)
+	fmt.Printf("  %s/tool list%s   List all registered LLM tools\n", colorLightYellow, colorReset)
+	fmt.Printf("  %s/tool run <name> key=value ...%s  Run a tool directly\n", colorLightYellow, colorReset)
 	fmt.Printf("  %s/history%s     Show conversation history\n", colorLightYellow, colorReset)
 	fmt.Printf("  %s/context%s     Show current context\n", colorLightYellow, colorReset)
 	fmt.Printf("  %s/context <text>%s  Set context for the conversation\n", colorLightYellow, colorReset)
@@ -240,6 +243,20 @@ func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) err
 			continue
 		}
 
+		if input == "/tool list" {
+			if err := printRegisteredTools(ctx, c); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(input, "/tool run ") {
+			if err := runToolCommand(ctx, c, strings.TrimPrefix(input, "/tool run ")); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
+			continue
+		}
+
 		if err := c.Chat(ctx, input, os.Stdout, opts); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		}
@@ -249,6 +266,83 @@ func runREPL(ctx context.Context, c *client.Client, opts client.ChatOptions) err
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// printRegisteredTools lists all tools registered with the daemon
+func printRegisteredTools(ctx context.Context, c *client.Client) error {
+	toolList, err := c.ListTools(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(toolList.Tools) == 0 {
+		fmt.Printf("%sNo tools registered.%s\n\n", colorGray, colorReset)
+		return nil
+	}
+
+	fmt.Printf("\n%sRegistered Tools:%s\n", colorWhite, colorReset)
+	for _, tool := range toolList.Tools {
+		fmt.Printf("  %s•%s %s%s%s\n", colorLightYellow, colorReset, colorWhite, tool.Name, colorReset)
+		// Truncate description if too long
+		desc := tool.Description
+		if len(desc) > 80 {
+			desc = desc[:77] + "..."
+		}
+		fmt.Printf("    %s%s%s\n", colorGray, desc, colorReset)
+	}
+	fmt.Println()
+
+	return nil
+}
+
+// runToolCommand parses and executes a tool command
+// Format: <tool_name> key=value key2=value2 ...
+func runToolCommand(ctx context.Context, c *client.Client, input string) error {
+	parts := strings.Fields(input)
+	if len(parts) == 0 {
+		return fmt.Errorf("usage: /tool run <name> [key=value ...]")
+	}
+
+	toolName := parts[0]
+	args := make(map[string]any)
+
+	// Parse key=value pairs
+	for _, part := range parts[1:] {
+		if !strings.Contains(part, "=") {
+			return fmt.Errorf("invalid argument format: %q (expected key=value)", part)
+		}
+		kv := strings.SplitN(part, "=", 2)
+		key := kv[0]
+		value := kv[1]
+
+		// Try to parse as JSON for complex values, otherwise use as string
+		var parsed any
+		if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+			// Not valid JSON, use as string
+			parsed = value
+		}
+		args[key] = parsed
+	}
+
+	fmt.Printf("%s⚡ Running %s...%s\n", colorGray, toolName, colorReset)
+
+	resp, err := c.ExecuteTool(ctx, toolName, args)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		fmt.Printf("%s✗ Error: %s%s\n", "\033[31m", resp.Error, colorReset)
+	} else {
+		fmt.Printf("%s✓ Success%s\n", "\033[32m", colorReset)
+	}
+
+	if resp.Output != "" {
+		fmt.Printf("\n%s\n", resp.Output)
+	}
+	fmt.Println()
 
 	return nil
 }
