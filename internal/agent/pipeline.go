@@ -151,6 +151,15 @@ func (p *Pipeline) Run(ctx context.Context, userMessage string, opts RunOptions,
 		// Plan with accumulated results
 		plan, rawXML, err := p.planWithResults(ctx, userMessage, opts, allResults)
 		if err != nil {
+			// If planning fails but we have tool results, fall back to synthesis
+			if len(allResults) > 0 {
+				p.logger.Warn().
+					Err(err).
+					Int("iteration", iteration).
+					Int("results", len(allResults)).
+					Msg("planning failed but have results, falling back to synthesis")
+				break
+			}
 			return nil, fmt.Errorf("planning failed (iteration %d): %w", iteration, err)
 		}
 
