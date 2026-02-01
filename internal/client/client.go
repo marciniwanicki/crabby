@@ -459,7 +459,7 @@ func formatToolCall(name, arguments string) string {
 	var args map[string]any
 	if name == "shell" && json.Unmarshal([]byte(arguments), &args) == nil {
 		if cmd, ok := args["command"].(string); ok {
-			return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n\n",
+			return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n",
 				colorLightYellow, colorReset,
 				colorWhiteBold, displayName, colorReset,
 				colorWhite, cmd, colorReset)
@@ -467,7 +467,7 @@ func formatToolCall(name, arguments string) string {
 	}
 
 	// Default format for other tools
-	return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n\n",
+	return fmt.Sprintf("%s⚡%s%s%s%s(%s%s%s)\n",
 		colorLightYellow, colorReset,
 		colorWhiteBold, displayName, colorReset,
 		colorWhite, arguments, colorReset)
@@ -513,7 +513,8 @@ func (m *markdownStreamer) Flush() {
 	m.buffer.Reset()
 
 	rendered := renderMarkdown(text)
-	fmt.Fprint(m.output, rendered)
+	// Add newline before answer to separate from question
+	fmt.Fprint(m.output, "\n"+rendered)
 }
 
 // renderMarkdown converts markdown to styled terminal output using glamour
