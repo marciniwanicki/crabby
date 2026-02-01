@@ -1,6 +1,6 @@
 module github.com/marciniwanicki/crabby
 
-go 1.25.4
+go 1.24
 
 require (
 	github.com/charmbracelet/glamour v0.10.0
