@@ -9,23 +9,26 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/marciniwanicki/crabby/internal/agent"
 	"github.com/marciniwanicki/crabby/internal/api"
+	"github.com/marciniwanicki/crabby/internal/tools"
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/proto"
 )
 
 // Handler manages WebSocket connections and message handling
 type Handler struct {
-	agent   *agent.Agent
-	logger  zerolog.Logger
-	history []agent.Message
-	context string
+	agent     *agent.Agent
+	shellTool *tools.ShellTool
+	logger    zerolog.Logger
+	history   []agent.Message
+	context   string
 }
 
 // NewHandler creates a new handler
-func NewHandler(agent *agent.Agent, logger zerolog.Logger) *Handler {
+func NewHandler(agent *agent.Agent, shellTool *tools.ShellTool, logger zerolog.Logger) *Handler {
 	return &Handler{
-		agent:  agent,
-		logger: logger,
+		agent:     agent,
+		shellTool: shellTool,
+		logger:    logger,
 	}
 }
 
@@ -100,6 +103,18 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 		Context: h.context,
 	}
 
+	// Set user request and command observer on shell tool
+	if h.shellTool != nil {
+		h.shellTool.SetUserRequest(message)
+		h.shellTool.SetCommandObserver(func(command string, isDiscovery bool) {
+			eventChan <- agent.Event{
+				Type:         agent.EventShellCommand,
+				ShellCommand: command,
+				IsDiscovery:  isDiscovery,
+			}
+		})
+	}
+
 	h.logger.Debug().
 		Int("history_len", len(h.history)).
 		Bool("has_context", h.context != "").
@@ -171,6 +186,21 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 						Name:    event.ToolName,
 						Output:  event.ToolOutput,
 						Success: event.ToolSuccess,
+					},
+				},
+			}
+
+		case agent.EventShellCommand:
+			h.logger.Debug().
+				Str("type", "shell_command").
+				Str("command", event.ShellCommand).
+				Bool("is_discovery", event.IsDiscovery).
+				Msg("streaming event")
+			resp = &api.ChatResponse{
+				Payload: &api.ChatResponse_ShellCommand{
+					ShellCommand: &api.ShellCommand{
+						Command:     event.ShellCommand,
+						IsDiscovery: event.IsDiscovery,
 					},
 				},
 			}

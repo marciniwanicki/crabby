@@ -14,7 +14,13 @@ message ChatResponse {
     ToolResult tool_result = 3;
     bool done = 4;
     string error = 5;
+    ShellCommand shell_command = 6;
   }
+}
+
+message ShellCommand {
+  string command = 1;
+  bool is_discovery = 2;
 }
 
 message TextChunk {

@@ -15,9 +15,18 @@ type ExternalTool struct {
 	WhenToUse   string            `yaml:"when_to_use"`
 	Access      ToolAccess        `yaml:"access"`
 	Check       ToolCheck         `yaml:"check"`
+	Env         ToolEnv           `yaml:"env,omitempty"`
 	Subcommands []ToolSubcommand  `yaml:"subcommands,omitempty"`
 	Examples    []string          `yaml:"examples,omitempty"`
 	Metadata    map[string]string `yaml:"metadata,omitempty"`
+}
+
+// ToolEnv defines environment variables for a tool
+type ToolEnv struct {
+	// Propagate lists env var names to inherit from parent shell
+	Propagate []string `yaml:"propagate,omitempty"`
+	// Set defines env vars to inject (key: value)
+	Set map[string]string `yaml:"set,omitempty"`
 }
 
 // ToolAccess defines how to access/invoke the tool
@@ -137,6 +146,32 @@ func (t *ExternalTool) Validate() error {
 		return fmt.Errorf("access command is required for shell tools")
 	}
 	return nil
+}
+
+// BuildEnv builds the environment variables for tool execution.
+// Returns a slice of "KEY=VALUE" strings suitable for exec.Cmd.Env.
+// If no env config, returns nil (inherit all from parent).
+func (t *ExternalTool) BuildEnv() []string {
+	// If no env configuration, return nil to inherit all
+	if len(t.Env.Propagate) == 0 && len(t.Env.Set) == 0 {
+		return nil
+	}
+
+	env := make([]string, 0)
+
+	// Propagate specified env vars from parent
+	for _, name := range t.Env.Propagate {
+		if val, ok := os.LookupEnv(name); ok {
+			env = append(env, name+"="+val)
+		}
+	}
+
+	// Add/override with explicitly set env vars
+	for name, val := range t.Env.Set {
+		env = append(env, name+"="+val)
+	}
+
+	return env
 }
 
 // GenerateSystemPrompt generates a description of the tool for the LLM

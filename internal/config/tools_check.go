@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os/exec"
 	"strings"
 	"time"
@@ -12,6 +13,10 @@ import (
 type ToolStatus struct {
 	Available bool
 	Message   string
+	// Detailed error information (only set when Available is false)
+	ExitCode int
+	Stdout   string
+	Stderr   string
 }
 
 // CheckAvailability runs the tool's check command to verify it's available
@@ -28,26 +33,47 @@ func (t *ExternalTool) CheckAvailability() ToolStatus {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", t.Check.Command)
+
+	// Set environment variables from tool config
+	if env := t.BuildEnv(); env != nil {
+		cmd.Env = env
+	}
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	output := stdout.String() + stderr.String()
+	stdoutStr := strings.TrimSpace(stdout.String())
+	stderrStr := strings.TrimSpace(stderr.String())
 
 	if err != nil {
+		// Extract exit code if available
+		exitCode := -1
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+		}
+
 		return ToolStatus{
 			Available: false,
 			Message:   "check failed: " + err.Error(),
+			ExitCode:  exitCode,
+			Stdout:    stdoutStr,
+			Stderr:    stderrStr,
 		}
 	}
 
 	// If expected string is set, verify it's in the output
+	output := stdoutStr + stderrStr
 	if t.Check.Expected != "" {
 		if !strings.Contains(output, t.Check.Expected) {
 			return ToolStatus{
 				Available: false,
-				Message:   "expected output not found",
+				Message:   "expected output not found: " + t.Check.Expected,
+				ExitCode:  0,
+				Stdout:    stdoutStr,
+				Stderr:    stderrStr,
 			}
 		}
 	}

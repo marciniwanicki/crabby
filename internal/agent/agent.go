@@ -18,6 +18,7 @@ const (
 	EventText EventType = iota
 	EventToolCall
 	EventToolResult
+	EventShellCommand // A shell command is being executed
 )
 
 // Role represents the message role
@@ -46,6 +47,10 @@ type Event struct {
 	// For EventToolResult
 	ToolOutput  string
 	ToolSuccess bool
+
+	// For EventShellCommand
+	ShellCommand string
+	IsDiscovery  bool // True if this is a discovery command (e.g., --help)
 }
 
 // Message represents a chat message

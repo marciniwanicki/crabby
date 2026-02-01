@@ -237,26 +237,6 @@ func TestWellKnownCommands(t *testing.T) {
 	}
 }
 
-func TestShellTool_HelpCache(t *testing.T) {
-	tool := NewShellTool(testSettings())
-
-	// Verify cache is initialized empty
-	tool.cacheMu.RLock()
-	if len(tool.helpCache) != 0 {
-		t.Error("expected empty help cache on initialization")
-	}
-	tool.cacheMu.RUnlock()
-
-	// Well-known commands should not populate the cache
-	_, _ = tool.Execute(map[string]any{"command": "echo hello"})
-
-	tool.cacheMu.RLock()
-	if len(tool.helpCache) != 0 {
-		t.Error("well-known commands should not populate help cache")
-	}
-	tool.cacheMu.RUnlock()
-}
-
 func TestParseSubcommands(t *testing.T) {
 	tool := NewShellTool(testSettings())
 

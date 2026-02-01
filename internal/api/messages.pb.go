@@ -132,6 +132,7 @@ type ChatResponse struct {
 	//	*ChatResponse_ToolResult
 	//	*ChatResponse_Done
 	//	*ChatResponse_Error
+	//	*ChatResponse_ShellCommand
 	Payload       isChatResponse_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -219,6 +220,15 @@ func (x *ChatResponse) GetError() string {
 	return ""
 }
 
+func (x *ChatResponse) GetShellCommand() *ShellCommand {
+	if x != nil {
+		if x, ok := x.Payload.(*ChatResponse_ShellCommand); ok {
+			return x.ShellCommand
+		}
+	}
+	return nil
+}
+
 type isChatResponse_Payload interface {
 	isChatResponse_Payload()
 }
@@ -243,6 +253,10 @@ type ChatResponse_Error struct {
 	Error string `protobuf:"bytes,5,opt,name=error,proto3,oneof"`
 }
 
+type ChatResponse_ShellCommand struct {
+	ShellCommand *ShellCommand `protobuf:"bytes,6,opt,name=shell_command,json=shellCommand,proto3,oneof"`
+}
+
 func (*ChatResponse_Text) isChatResponse_Payload() {}
 
 func (*ChatResponse_ToolCall) isChatResponse_Payload() {}
@@ -252,6 +266,60 @@ func (*ChatResponse_ToolResult) isChatResponse_Payload() {}
 func (*ChatResponse_Done) isChatResponse_Payload() {}
 
 func (*ChatResponse_Error) isChatResponse_Payload() {}
+
+func (*ChatResponse_ShellCommand) isChatResponse_Payload() {}
+
+type ShellCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	IsDiscovery   bool                   `protobuf:"varint,2,opt,name=is_discovery,json=isDiscovery,proto3" json:"is_discovery,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShellCommand) Reset() {
+	*x = ShellCommand{}
+	mi := &file_internal_api_messages_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShellCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShellCommand) ProtoMessage() {}
+
+func (x *ShellCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_api_messages_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShellCommand.ProtoReflect.Descriptor instead.
+func (*ShellCommand) Descriptor() ([]byte, []int) {
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ShellCommand) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *ShellCommand) GetIsDiscovery() bool {
+	if x != nil {
+		return x.IsDiscovery
+	}
+	return false
+}
 
 type TextChunk struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -263,7 +331,7 @@ type TextChunk struct {
 
 func (x *TextChunk) Reset() {
 	*x = TextChunk{}
-	mi := &file_internal_api_messages_proto_msgTypes[2]
+	mi := &file_internal_api_messages_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -275,7 +343,7 @@ func (x *TextChunk) String() string {
 func (*TextChunk) ProtoMessage() {}
 
 func (x *TextChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[2]
+	mi := &file_internal_api_messages_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -288,7 +356,7 @@ func (x *TextChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextChunk.ProtoReflect.Descriptor instead.
 func (*TextChunk) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{2}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TextChunk) GetContent() string {
@@ -316,7 +384,7 @@ type ToolCall struct {
 
 func (x *ToolCall) Reset() {
 	*x = ToolCall{}
-	mi := &file_internal_api_messages_proto_msgTypes[3]
+	mi := &file_internal_api_messages_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +396,7 @@ func (x *ToolCall) String() string {
 func (*ToolCall) ProtoMessage() {}
 
 func (x *ToolCall) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[3]
+	mi := &file_internal_api_messages_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +409,7 @@ func (x *ToolCall) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolCall.ProtoReflect.Descriptor instead.
 func (*ToolCall) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{3}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ToolCall) GetId() string {
@@ -377,7 +445,7 @@ type ToolResult struct {
 
 func (x *ToolResult) Reset() {
 	*x = ToolResult{}
-	mi := &file_internal_api_messages_proto_msgTypes[4]
+	mi := &file_internal_api_messages_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +457,7 @@ func (x *ToolResult) String() string {
 func (*ToolResult) ProtoMessage() {}
 
 func (x *ToolResult) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[4]
+	mi := &file_internal_api_messages_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +470,7 @@ func (x *ToolResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolResult.ProtoReflect.Descriptor instead.
 func (*ToolResult) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{4}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ToolResult) GetId() string {
@@ -441,7 +509,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_internal_api_messages_proto_msgTypes[5]
+	mi := &file_internal_api_messages_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -453,7 +521,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[5]
+	mi := &file_internal_api_messages_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -466,7 +534,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{5}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{6}
 }
 
 type StatusResponse struct {
@@ -480,7 +548,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_internal_api_messages_proto_msgTypes[6]
+	mi := &file_internal_api_messages_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +560,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[6]
+	mi := &file_internal_api_messages_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +573,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{6}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StatusResponse) GetHealthy() bool {
@@ -539,7 +607,7 @@ type HistoryMessage struct {
 
 func (x *HistoryMessage) Reset() {
 	*x = HistoryMessage{}
-	mi := &file_internal_api_messages_proto_msgTypes[7]
+	mi := &file_internal_api_messages_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +619,7 @@ func (x *HistoryMessage) String() string {
 func (*HistoryMessage) ProtoMessage() {}
 
 func (x *HistoryMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[7]
+	mi := &file_internal_api_messages_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +632,7 @@ func (x *HistoryMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryMessage.ProtoReflect.Descriptor instead.
 func (*HistoryMessage) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{7}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *HistoryMessage) GetRole() Role {
@@ -590,7 +658,7 @@ type HistoryResponse struct {
 
 func (x *HistoryResponse) Reset() {
 	*x = HistoryResponse{}
-	mi := &file_internal_api_messages_proto_msgTypes[8]
+	mi := &file_internal_api_messages_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +670,7 @@ func (x *HistoryResponse) String() string {
 func (*HistoryResponse) ProtoMessage() {}
 
 func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[8]
+	mi := &file_internal_api_messages_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +683,7 @@ func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryResponse.ProtoReflect.Descriptor instead.
 func (*HistoryResponse) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{8}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *HistoryResponse) GetMessages() []*HistoryMessage {
@@ -634,7 +702,7 @@ type ContextRequest struct {
 
 func (x *ContextRequest) Reset() {
 	*x = ContextRequest{}
-	mi := &file_internal_api_messages_proto_msgTypes[9]
+	mi := &file_internal_api_messages_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -646,7 +714,7 @@ func (x *ContextRequest) String() string {
 func (*ContextRequest) ProtoMessage() {}
 
 func (x *ContextRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[9]
+	mi := &file_internal_api_messages_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -659,7 +727,7 @@ func (x *ContextRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextRequest.ProtoReflect.Descriptor instead.
 func (*ContextRequest) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{9}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ContextRequest) GetContext() string {
@@ -678,7 +746,7 @@ type ContextResponse struct {
 
 func (x *ContextResponse) Reset() {
 	*x = ContextResponse{}
-	mi := &file_internal_api_messages_proto_msgTypes[10]
+	mi := &file_internal_api_messages_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -690,7 +758,7 @@ func (x *ContextResponse) String() string {
 func (*ContextResponse) ProtoMessage() {}
 
 func (x *ContextResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_api_messages_proto_msgTypes[10]
+	mi := &file_internal_api_messages_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -703,7 +771,7 @@ func (x *ContextResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextResponse.ProtoReflect.Descriptor instead.
 func (*ContextResponse) Descriptor() ([]byte, []int) {
-	return file_internal_api_messages_proto_rawDescGZIP(), []int{10}
+	return file_internal_api_messages_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ContextResponse) GetContext() string {
@@ -721,15 +789,19 @@ const file_internal_api_messages_proto_rawDesc = "" +
 	"\vChatRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\"\xed\x01\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"\xb1\x02\n" +
 	"\fChatResponse\x12.\n" +
 	"\x04text\x18\x01 \x01(\v2\x18.crabby.api.v1.TextChunkH\x00R\x04text\x126\n" +
 	"\ttool_call\x18\x02 \x01(\v2\x17.crabby.api.v1.ToolCallH\x00R\btoolCall\x12<\n" +
 	"\vtool_result\x18\x03 \x01(\v2\x19.crabby.api.v1.ToolResultH\x00R\n" +
 	"toolResult\x12\x14\n" +
 	"\x04done\x18\x04 \x01(\bH\x00R\x04done\x12\x16\n" +
-	"\x05error\x18\x05 \x01(\tH\x00R\x05errorB\t\n" +
-	"\apayload\"N\n" +
+	"\x05error\x18\x05 \x01(\tH\x00R\x05error\x12B\n" +
+	"\rshell_command\x18\x06 \x01(\v2\x1b.crabby.api.v1.ShellCommandH\x00R\fshellCommandB\t\n" +
+	"\apayload\"K\n" +
+	"\fShellCommand\x12\x18\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand\x12!\n" +
+	"\fis_discovery\x18\x02 \x01(\bR\visDiscovery\"N\n" +
 	"\tTextChunk\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\tR\acontent\x12'\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x13.crabby.api.v1.RoleR\x04role\"L\n" +
@@ -776,33 +848,35 @@ func file_internal_api_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_api_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_internal_api_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_internal_api_messages_proto_goTypes = []any{
 	(Role)(0),               // 0: crabby.api.v1.Role
 	(*ChatRequest)(nil),     // 1: crabby.api.v1.ChatRequest
 	(*ChatResponse)(nil),    // 2: crabby.api.v1.ChatResponse
-	(*TextChunk)(nil),       // 3: crabby.api.v1.TextChunk
-	(*ToolCall)(nil),        // 4: crabby.api.v1.ToolCall
-	(*ToolResult)(nil),      // 5: crabby.api.v1.ToolResult
-	(*StatusRequest)(nil),   // 6: crabby.api.v1.StatusRequest
-	(*StatusResponse)(nil),  // 7: crabby.api.v1.StatusResponse
-	(*HistoryMessage)(nil),  // 8: crabby.api.v1.HistoryMessage
-	(*HistoryResponse)(nil), // 9: crabby.api.v1.HistoryResponse
-	(*ContextRequest)(nil),  // 10: crabby.api.v1.ContextRequest
-	(*ContextResponse)(nil), // 11: crabby.api.v1.ContextResponse
+	(*ShellCommand)(nil),    // 3: crabby.api.v1.ShellCommand
+	(*TextChunk)(nil),       // 4: crabby.api.v1.TextChunk
+	(*ToolCall)(nil),        // 5: crabby.api.v1.ToolCall
+	(*ToolResult)(nil),      // 6: crabby.api.v1.ToolResult
+	(*StatusRequest)(nil),   // 7: crabby.api.v1.StatusRequest
+	(*StatusResponse)(nil),  // 8: crabby.api.v1.StatusResponse
+	(*HistoryMessage)(nil),  // 9: crabby.api.v1.HistoryMessage
+	(*HistoryResponse)(nil), // 10: crabby.api.v1.HistoryResponse
+	(*ContextRequest)(nil),  // 11: crabby.api.v1.ContextRequest
+	(*ContextResponse)(nil), // 12: crabby.api.v1.ContextResponse
 }
 var file_internal_api_messages_proto_depIdxs = []int32{
-	3, // 0: crabby.api.v1.ChatResponse.text:type_name -> crabby.api.v1.TextChunk
-	4, // 1: crabby.api.v1.ChatResponse.tool_call:type_name -> crabby.api.v1.ToolCall
-	5, // 2: crabby.api.v1.ChatResponse.tool_result:type_name -> crabby.api.v1.ToolResult
-	0, // 3: crabby.api.v1.TextChunk.role:type_name -> crabby.api.v1.Role
-	0, // 4: crabby.api.v1.HistoryMessage.role:type_name -> crabby.api.v1.Role
-	8, // 5: crabby.api.v1.HistoryResponse.messages:type_name -> crabby.api.v1.HistoryMessage
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	4, // 0: crabby.api.v1.ChatResponse.text:type_name -> crabby.api.v1.TextChunk
+	5, // 1: crabby.api.v1.ChatResponse.tool_call:type_name -> crabby.api.v1.ToolCall
+	6, // 2: crabby.api.v1.ChatResponse.tool_result:type_name -> crabby.api.v1.ToolResult
+	3, // 3: crabby.api.v1.ChatResponse.shell_command:type_name -> crabby.api.v1.ShellCommand
+	0, // 4: crabby.api.v1.TextChunk.role:type_name -> crabby.api.v1.Role
+	0, // 5: crabby.api.v1.HistoryMessage.role:type_name -> crabby.api.v1.Role
+	9, // 6: crabby.api.v1.HistoryResponse.messages:type_name -> crabby.api.v1.HistoryMessage
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_internal_api_messages_proto_init() }
@@ -816,6 +890,7 @@ func file_internal_api_messages_proto_init() {
 		(*ChatResponse_ToolResult)(nil),
 		(*ChatResponse_Done)(nil),
 		(*ChatResponse_Error)(nil),
+		(*ChatResponse_ShellCommand)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -823,7 +898,7 @@ func file_internal_api_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_api_messages_proto_rawDesc), len(file_internal_api_messages_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

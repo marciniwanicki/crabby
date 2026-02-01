@@ -45,6 +45,17 @@ func NewServer(port int, ollamaURL, model string) *Server {
 		logCloser = nil
 	}
 
+	// Clear old LLM call logs
+	if err := config.ClearLLMCallLogs(); err != nil {
+		logger.Warn().Err(err).Msg("failed to clear LLM call logs")
+	}
+
+	// Set up LLM call logger
+	llmCallLogger, err := config.NewLLMCallLogger()
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to set up LLM call logger")
+	}
+
 	// Load settings
 	settings, err := config.Load()
 	if err != nil {
@@ -73,7 +84,7 @@ func NewServer(port int, ollamaURL, model string) *Server {
 	systemPrompt := templates.Identity + "\n\n" + templates.User
 
 	// Create Ollama client
-	ollama := NewOllamaClient(ollamaURL, model)
+	ollama := NewOllamaClient(ollamaURL, model, llmCallLogger)
 
 	// Load external tools
 	externalTools, toolStatuses, err := config.LoadAndCheckTools()
@@ -84,7 +95,17 @@ func NewServer(port int, ollamaURL, model string) *Server {
 			if status.Available {
 				logger.Info().Str("tool", name).Msg("external tool available")
 			} else {
-				logger.Warn().Str("tool", name).Str("reason", status.Message).Msg("external tool not available")
+				logEvent := logger.Warn().
+					Str("tool", name).
+					Str("reason", status.Message).
+					Int("exit_code", status.ExitCode)
+				if status.Stdout != "" {
+					logEvent = logEvent.Str("stdout", status.Stdout)
+				}
+				if status.Stderr != "" {
+					logEvent = logEvent.Str("stderr", status.Stderr)
+				}
+				logEvent.Msg("external tool not available")
 			}
 		}
 	}
@@ -96,12 +117,13 @@ func NewServer(port int, ollamaURL, model string) *Server {
 	var shellTool *tools.ShellTool
 	if settings.Tools.Shell.Enabled {
 		if len(externalTools) > 0 {
-			shellTool = tools.NewShellToolWithExternalTools(settings, externalTools)
+			// Use LLM-enabled shell tool for smart discovery
+			shellTool = tools.NewShellToolWithLLM(settings, externalTools, ollama)
 		} else {
 			shellTool = tools.NewShellTool(settings)
 		}
 		registry.Register(shellTool)
-		logger.Info().Msg("registered shell tool")
+		logger.Info().Msg("registered shell tool with LLM support")
 	}
 
 	// Register write tool if enabled
@@ -122,8 +144,8 @@ func NewServer(port int, ollamaURL, model string) *Server {
 	// Create agent with system prompt from templates
 	agnt := agent.NewAgent(ollama, registry, logger, systemPrompt)
 
-	// Create handler
-	handler := NewHandler(agnt, logger)
+	// Create handler with shell tool for smart discovery
+	handler := NewHandler(agnt, shellTool, logger)
 
 	return &Server{
 		port:      port,

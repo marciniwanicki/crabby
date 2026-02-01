@@ -259,6 +259,11 @@ func (c *Client) Chat(ctx context.Context, message string, output io.Writer, opt
 			}
 			spin.Resume()
 
+		case *api.ChatResponse_ShellCommand:
+			spin.Pause()
+			fmt.Fprint(output, formatShellCommand(payload.ShellCommand.Command, payload.ShellCommand.IsDiscovery))
+			spin.Resume()
+
 		case *api.ChatResponse_Done:
 			stopSpinner()
 			mdStream.Flush() // Flush remaining content
@@ -448,6 +453,16 @@ func (c *Client) PrintHistory(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// formatShellCommand formats a shell command for display
+func formatShellCommand(command string, isDiscovery bool) string {
+	prefix := "$ "
+	if isDiscovery {
+		prefix = "? " // Different prefix for discovery commands
+	}
+	return fmt.Sprintf("%s%s%s%s%s\n",
+		colorGray, prefix, colorWhite, command, colorReset)
 }
 
 // formatToolCall formats a tool call for display

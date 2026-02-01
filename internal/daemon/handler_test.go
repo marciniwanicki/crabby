@@ -15,7 +15,7 @@ func testLogger() zerolog.Logger {
 func TestHandler_Context(t *testing.T) {
 	registry := tools.NewRegistry()
 	agnt := agent.NewAgent(nil, registry, testLogger(), "system prompt")
-	handler := NewHandler(agnt, testLogger())
+	handler := NewHandler(agnt, nil, testLogger())
 
 	// Initially empty
 	if got := handler.Context(); got != "" {
@@ -38,7 +38,7 @@ func TestHandler_Context(t *testing.T) {
 func TestHandler_FullContext(t *testing.T) {
 	registry := tools.NewRegistry()
 	agnt := agent.NewAgent(nil, registry, testLogger(), "system prompt")
-	handler := NewHandler(agnt, testLogger())
+	handler := NewHandler(agnt, nil, testLogger())
 
 	// Without user context, should return just system prompt
 	if got := handler.FullContext(); got != "system prompt" {
@@ -56,7 +56,7 @@ func TestHandler_FullContext(t *testing.T) {
 func TestHandler_History(t *testing.T) {
 	registry := tools.NewRegistry()
 	agnt := agent.NewAgent(nil, registry, testLogger(), "system prompt")
-	handler := NewHandler(agnt, testLogger())
+	handler := NewHandler(agnt, nil, testLogger())
 
 	// Initially empty
 	if got := handler.History(); len(got) != 0 {

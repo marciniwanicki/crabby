@@ -3,16 +3,26 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/marciniwanicki/crabby/internal/config"
 )
 
 const shellTimeout = 30 * time.Second
+const discoveryTimeout = 60 * time.Second
+
+// LLMClient interface for making LLM calls during tool discovery
+type LLMClient interface {
+	// SimpleChat makes a simple chat completion call without tools
+	SimpleChat(ctx context.Context, systemPrompt, userMessage string) (string, error)
+}
+
+// CommandObserver is called when a shell command is executed
+type CommandObserver func(command string, isDiscovery bool)
 
 // Well-known system commands that don't need help discovery
 var wellKnownCommands = map[string]bool{
@@ -37,15 +47,15 @@ var wellKnownCommands = map[string]bool{
 type ShellTool struct {
 	settings      *config.Settings
 	externalTools []*config.ExternalTool
-	helpCache     map[string]string
-	cacheMu       sync.RWMutex
+	llm           LLMClient
+	userRequest   string          // The original user request for context during discovery
+	observer      CommandObserver // Optional callback when commands are executed
 }
 
 // NewShellTool creates a new shell tool
 func NewShellTool(settings *config.Settings) *ShellTool {
 	return &ShellTool{
-		settings:  settings,
-		helpCache: make(map[string]string),
+		settings: settings,
 	}
 }
 
@@ -54,8 +64,26 @@ func NewShellToolWithExternalTools(settings *config.Settings, externalTools []*c
 	return &ShellTool{
 		settings:      settings,
 		externalTools: externalTools,
-		helpCache:     make(map[string]string),
 	}
+}
+
+// NewShellToolWithLLM creates a shell tool with LLM support for smart discovery
+func NewShellToolWithLLM(settings *config.Settings, externalTools []*config.ExternalTool, llm LLMClient) *ShellTool {
+	return &ShellTool{
+		settings:      settings,
+		externalTools: externalTools,
+		llm:           llm,
+	}
+}
+
+// SetUserRequest sets the current user request for context during discovery
+func (t *ShellTool) SetUserRequest(request string) {
+	t.userRequest = request
+}
+
+// SetCommandObserver sets a callback that's invoked when any shell command is executed
+func (t *ShellTool) SetCommandObserver(observer CommandObserver) {
+	t.observer = observer
 }
 
 func (t *ShellTool) Name() string {
@@ -136,13 +164,31 @@ func (t *ShellTool) Execute(args map[string]any) (string, error) {
 	}
 
 	// Check if this is an external tool that needs discovery
-	discoveryInfo := t.runToolDiscoveryIfNeeded(command)
+	// If discovery happens, we return ONLY the discovery info and don't execute the command
+	// This gives the agent a chance to learn the tool before using it
+	discoveryInfo, isFirstUse := t.runToolDiscoveryIfNeeded(command)
+	if isFirstUse && discoveryInfo != "" {
+		return discoveryInfo + "\n\n" +
+			"=== IMPORTANT: Tool discovery complete. Do NOT re-run the same command. ===\n" +
+			"Use the discovered information above to construct a VALID command.\n" +
+			"Check the available subcommands and their options before proceeding.", nil
+	}
+
+	// Notify observer of command execution
+	if t.observer != nil {
+		t.observer(command, false)
+	}
 
 	// Execute with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), shellTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+
+	// Set environment variables if this is an external tool
+	if env := t.getExternalToolEnv(command); env != nil {
+		cmd.Env = env
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -163,16 +209,30 @@ func (t *ShellTool) Execute(args map[string]any) (string, error) {
 		return output, fmt.Errorf("command timed out after %v", shellTimeout)
 	}
 
-	// Prepend discovery info if this was first use
-	if discoveryInfo != "" {
-		output = discoveryInfo + "\n---\nCommand output:\n" + output
-	}
-
 	if err != nil {
 		return output, fmt.Errorf("command failed: %w", err)
 	}
 
 	return output, nil
+}
+
+// getExternalToolEnv returns the environment variables for an external tool command.
+// Returns nil if no external tool matches or no env config is set.
+func (t *ShellTool) getExternalToolEnv(command string) []string {
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return nil
+	}
+
+	baseCmd := parts[0]
+
+	for _, ext := range t.externalTools {
+		if ext.Access.Type == "shell" && ext.Access.Command == baseCmd {
+			return ext.BuildEnv()
+		}
+	}
+
+	return nil
 }
 
 func (t *ShellTool) validateCommand(command string) error {
@@ -208,58 +268,46 @@ func (t *ShellTool) validateCommand(command string) error {
 		baseCmd, strings.Join(t.settings.Tools.Shell.Allowlist, ", "))
 }
 
-// runToolDiscoveryIfNeeded checks if this is an external tool that needs discovery
-// and runs a discovery loop to learn the tool's subcommands and options
-func (t *ShellTool) runToolDiscoveryIfNeeded(command string) string {
+// runToolDiscoveryIfNeeded checks if this is an external tool and runs discovery.
+// Returns the discovery text and whether this is an external tool.
+func (t *ShellTool) runToolDiscoveryIfNeeded(command string) (string, bool) {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
-		return ""
+		return "", false
 	}
 
 	baseCmd := parts[0]
 
 	// Skip well-known system commands
 	if wellKnownCommands[baseCmd] {
-		return ""
+		return "", false
 	}
 
-	// Check if we've already discovered this command
-	t.cacheMu.RLock()
-	if _, exists := t.helpCache[baseCmd]; exists {
-		t.cacheMu.RUnlock()
-		return ""
-	}
-	t.cacheMu.RUnlock()
-
-	// Check if this is an external tool - if so, run full discovery
-	var externalTool *config.ExternalTool
+	// Check if this is an external tool - if so, run discovery
 	for _, ext := range t.externalTools {
 		if ext.Access.Type == "shell" && ext.Access.Command == baseCmd {
-			externalTool = ext
-			break
+			// Always run discovery for external tools (no caching)
+			discoveryText := t.runExternalToolDiscovery(ext)
+			return discoveryText, true
 		}
 	}
 
-	var discoveryText string
-	if externalTool != nil {
-		// Run full discovery loop for external tools
-		discoveryText = t.runExternalToolDiscovery(externalTool)
-	} else {
-		// Basic discovery for other unknown commands
-		discoveryText = t.discoverCommand(baseCmd)
-	}
-
-	// Cache the discovery (even if empty)
-	t.cacheMu.Lock()
-	t.helpCache[baseCmd] = discoveryText
-	t.cacheMu.Unlock()
-
-	return discoveryText
+	return "", false
 }
 
-// runExternalToolDiscovery runs a comprehensive discovery loop for an external tool
+// DiscoveryResponse represents the LLM's response for iterative discovery
+type DiscoveryResponse struct {
+	Command  string `json:"command"`
+	Continue bool   `json:"continue"`
+	Error    string `json:"error,omitempty"`
+}
+
+// runExternalToolDiscovery runs an iterative discovery loop for an external tool.
+// It uses the LLM to guide exploration step-by-step until a complete answer is found.
 func (t *ShellTool) runExternalToolDiscovery(tool *config.ExternalTool) string {
 	var result strings.Builder
+	ctx, cancel := context.WithTimeout(context.Background(), discoveryTimeout)
+	defer cancel()
 
 	baseCmd := tool.Access.Command
 
@@ -268,10 +316,188 @@ func (t *ShellTool) runExternalToolDiscovery(tool *config.ExternalTool) string {
 	if tool.WhenToUse != "" {
 		result.WriteString(fmt.Sprintf("**When to use:** %s\n\n", tool.WhenToUse))
 	}
-	result.WriteString("Running discovery loop to learn available commands...\n\n")
 
-	// Step 1: Fetch main help
-	result.WriteString("## Step 1: Main command help\n")
+	// If no LLM or no user request, fall back to simple help discovery
+	if t.llm == nil || t.userRequest == "" {
+		return t.runSimpleDiscovery(tool, &result)
+	}
+
+	// Iterative discovery loop
+	const maxIterations = 10
+	var discoveredHelp []string
+
+discoveryLoop:
+	for i := 0; i < maxIterations; i++ {
+		select {
+		case <-ctx.Done():
+			result.WriteString("\n(Discovery timeout reached)\n")
+			break discoveryLoop
+		default:
+		}
+
+		// Ask LLM what command to run next
+		nextAction, err := t.askNextDiscoveryStep(ctx, baseCmd, t.userRequest, discoveredHelp)
+		if err != nil {
+			result.WriteString(fmt.Sprintf("\n## Discovery error: %v\n", err))
+			break
+		}
+
+		if nextAction.Error != "" {
+			result.WriteString(fmt.Sprintf("\n## LLM reported error: %s\n", nextAction.Error))
+			break
+		}
+
+		if nextAction.Command == "" {
+			result.WriteString("\n## Discovery complete (no more commands to run)\n")
+			break
+		}
+
+		// Validate the command starts with our tool
+		if !strings.HasPrefix(nextAction.Command, baseCmd) {
+			result.WriteString(fmt.Sprintf("\n## Invalid command (must start with %s): %s\n", baseCmd, nextAction.Command))
+			break
+		}
+
+		// Execute the discovery command
+		result.WriteString(fmt.Sprintf("\n## Step %d: Running `%s`\n", i+1, nextAction.Command))
+		output := t.executeDiscoveryCommand(ctx, nextAction.Command, tool)
+
+		if output == "" {
+			result.WriteString("(No output)\n")
+		} else {
+			// Truncate if needed
+			if len(output) > 2000 {
+				output = output[:2000] + "\n... (truncated)"
+			}
+			result.WriteString("```\n")
+			result.WriteString(output)
+			result.WriteString("\n```\n")
+
+			// Track discovered help for context
+			discoveredHelp = append(discoveredHelp, fmt.Sprintf("Command: %s\nOutput:\n%s", nextAction.Command, output))
+		}
+
+		if !nextAction.Continue {
+			result.WriteString("\n## Discovery complete\n")
+			break
+		}
+	}
+
+	result.WriteString("\n=== Use the discovered information above to construct your command. ===\n")
+
+	// Truncate total if needed
+	output := result.String()
+	if len(output) > 15000 {
+		output = output[:15000] + "\n... (discovery output truncated)"
+	}
+
+	return output
+}
+
+// askNextDiscoveryStep asks the LLM what command to run next in discovery
+func (t *ShellTool) askNextDiscoveryStep(ctx context.Context, toolName, userRequest string, previousOutputs []string) (*DiscoveryResponse, error) {
+	systemPrompt := fmt.Sprintf(`You are exploring the '%s' CLI tool to help answer a user's question.
+Your goal is to discover the exact command(s) needed to fulfill the user's request.
+
+RULES:
+1. Start with '%s --help' or '%s help' to see available commands
+2. Drill down into relevant subcommands by running their --help
+3. Stop when you've found the complete command syntax needed
+4. All commands MUST start with '%s'
+
+RESPONSE FORMAT - Reply with ONLY valid JSON, nothing else:
+- To run a command: {"command": "%s <subcommand> --help", "continue": true}
+- When done discovering: {"command": "%s <final-command>", "continue": false}
+- If stuck or error: {"error": "explanation"}
+
+Keep exploring until you find the specific command that answers the user's question.`,
+		toolName, toolName, toolName, toolName, toolName, toolName)
+
+	var userMessage strings.Builder
+	userMessage.WriteString(fmt.Sprintf("User request: %s\n\n", userRequest))
+
+	if len(previousOutputs) == 0 {
+		userMessage.WriteString("This is the first step. Start by getting the main help.\n")
+	} else {
+		userMessage.WriteString("Previous discovery steps:\n")
+		for i, output := range previousOutputs {
+			// Limit context size
+			if i > 3 {
+				userMessage.WriteString(fmt.Sprintf("\n... and %d more previous outputs\n", len(previousOutputs)-i))
+				break
+			}
+			// Truncate individual outputs in context
+			o := output
+			if len(o) > 1500 {
+				o = o[:1500] + "\n... (truncated)"
+			}
+			userMessage.WriteString(fmt.Sprintf("\n--- Step %d ---\n%s\n", i+1, o))
+		}
+		userMessage.WriteString("\nWhat command should I run next? Remember to output ONLY JSON.")
+	}
+
+	response, err := t.llm.SimpleChat(ctx, systemPrompt, userMessage.String())
+	if err != nil {
+		return nil, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	// Parse JSON response
+	response = strings.TrimSpace(response)
+
+	// Try to extract JSON from response (LLM might add extra text)
+	var result DiscoveryResponse
+	if err := json.Unmarshal([]byte(response), &result); err != nil {
+		// Try to find JSON in response
+		start := strings.Index(response, "{")
+		end := strings.LastIndex(response, "}")
+		if start != -1 && end > start {
+			if err := json.Unmarshal([]byte(response[start:end+1]), &result); err != nil {
+				return nil, fmt.Errorf("failed to parse LLM response as JSON: %s", response)
+			}
+		} else {
+			return nil, fmt.Errorf("no JSON found in response: %s", response)
+		}
+	}
+
+	return &result, nil
+}
+
+// executeDiscoveryCommand runs a command during discovery with proper environment
+func (t *ShellTool) executeDiscoveryCommand(ctx context.Context, command string, tool *config.ExternalTool) string {
+	// Notify observer of discovery command
+	if t.observer != nil {
+		t.observer(command, true)
+	}
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+
+	// Set environment variables
+	if env := tool.BuildEnv(); env != nil {
+		cmd.Env = env
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	_ = cmd.Run() // Ignore error - help commands often exit non-zero
+
+	output := stdout.String()
+	if stderr.Len() > 0 {
+		if output != "" {
+			output += "\n"
+		}
+		output += stderr.String()
+	}
+
+	return output
+}
+
+// runSimpleDiscovery is the fallback when no LLM is available
+func (t *ShellTool) runSimpleDiscovery(tool *config.ExternalTool, result *strings.Builder) string {
+	baseCmd := tool.Access.Command
+
+	result.WriteString("## Main command help\n")
 	mainHelp := t.fetchSingleHelp(baseCmd, "")
 	if mainHelp == "" {
 		result.WriteString("Could not fetch help for main command.\n")
@@ -280,102 +506,15 @@ func (t *ShellTool) runExternalToolDiscovery(tool *config.ExternalTool) string {
 	result.WriteString(mainHelp)
 	result.WriteString("\n")
 
-	// Step 2: Parse and discover subcommands
+	// Parse and show subcommands
 	subcommands := t.parseSubcommands(mainHelp)
-	if len(subcommands) == 0 {
-		result.WriteString("\n## No subcommands detected\n")
-		return result.String()
-	}
-
-	result.WriteString(fmt.Sprintf("\n## Step 2: Discovered %d subcommands\n", len(subcommands)))
-	result.WriteString("Fetching help for each subcommand...\n\n")
-
-	// Limit subcommands to avoid too much output
-	maxSubcommands := 10
-	if len(subcommands) > maxSubcommands {
-		result.WriteString(fmt.Sprintf("(Limiting to first %d of %d subcommands)\n\n", maxSubcommands, len(subcommands)))
-		subcommands = subcommands[:maxSubcommands]
-	}
-
-	// Step 3: Fetch help for each subcommand
-	for i, sub := range subcommands {
-		result.WriteString(fmt.Sprintf("### %d. %s %s\n", i+1, baseCmd, sub))
-		subHelp := t.fetchSingleHelp(baseCmd, sub)
-		if subHelp != "" {
-			// Truncate if too long
-			if len(subHelp) > 1000 {
-				subHelp = subHelp[:1000] + "\n... (truncated)"
-			}
-			result.WriteString(subHelp)
-		} else {
-			result.WriteString("(No help available)")
-		}
-		result.WriteString("\n\n")
-	}
-
-	result.WriteString("=== Discovery complete. Use the information above to construct correct commands. ===\n")
-
-	// Truncate total if needed
-	output := result.String()
-	if len(output) > 8000 {
-		output = output[:8000] + "\n... (discovery output truncated)"
-	}
-
-	return output
-}
-
-// discoverCommand fetches help for a command and recursively discovers subcommands
-func (t *ShellTool) discoverCommand(baseCmd string) string {
-	var result strings.Builder
-
-	// Fetch top-level help
-	topHelp := t.fetchSingleHelp(baseCmd, "")
-	if topHelp == "" {
-		return ""
-	}
-
-	result.WriteString(fmt.Sprintf("=== Discovered '%s' (first use) ===\n\n", baseCmd))
-	result.WriteString("## Main command help:\n")
-	result.WriteString(topHelp)
-	result.WriteString("\n")
-
-	// Parse for subcommands and fetch their help
-	subcommands := t.parseSubcommands(topHelp)
 	if len(subcommands) > 0 {
-		result.WriteString("\n## Subcommand details:\n")
-
-		// Limit to first 5 subcommands to avoid too much output
-		limit := 5
-		if len(subcommands) < limit {
-			limit = len(subcommands)
-		}
-
-		for i := 0; i < limit; i++ {
-			sub := subcommands[i]
-			subHelp := t.fetchSingleHelp(baseCmd, sub)
-			if subHelp != "" {
-				result.WriteString(fmt.Sprintf("\n### %s %s:\n", baseCmd, sub))
-				// Truncate individual subcommand help
-				if len(subHelp) > 800 {
-					subHelp = subHelp[:800] + "\n... (truncated)"
-				}
-				result.WriteString(subHelp)
-				result.WriteString("\n")
-			}
-		}
-
-		if len(subcommands) > limit {
-			result.WriteString(fmt.Sprintf("\n... and %d more subcommands\n", len(subcommands)-limit))
-		}
+		fmt.Fprintf(result, "\n## Available subcommands: %v\n", subcommands)
+		result.WriteString("Run `<command> <subcommand> --help` to learn more about each.\n")
 	}
 
-	// Truncate total output if too long
-	output := result.String()
-	if len(output) > 4000 {
-		output = output[:4000] + "\n... (truncated)"
-	}
-
-	return output
+	result.WriteString("\n=== Discovery complete. ===\n")
+	return result.String()
 }
 
 // fetchSingleHelp tries to get help for a command or subcommand
@@ -401,6 +540,11 @@ func (t *ShellTool) fetchSingleHelp(baseCmd, subcommand string) string {
 			}
 		} else {
 			cmdStr = fmt.Sprintf("%s %s", baseCmd, pattern)
+		}
+
+		// Notify observer of discovery command
+		if t.observer != nil {
+			t.observer(cmdStr, true)
 		}
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
