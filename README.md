@@ -67,7 +67,7 @@ crabby
 crabby "What is the capital of France?"
 ```
 
-In interactive mode, type your messages and press Enter. Type `exit` to leave or `Ctrl+C` to interrupt.
+In interactive mode, type your messages and press Enter. Type `/exit` to leave or `Ctrl+C` to interrupt.
 
 ### Chat Commands
 
@@ -75,7 +75,10 @@ While in interactive mode, you can use special commands:
 
 | Command | Description |
 |---------|-------------|
+| `/help` | Show available commands |
 | `/exit` | Leave the chat |
+| `/terminate` | Stop the daemon and exit |
+| `/tools` | List available external tools |
 | `/history` | Show conversation history |
 | `/context` | Show full context sent to the LLM |
 | `/context <text>` | Add custom context for subsequent messages |
@@ -92,7 +95,7 @@ Shows daemon status, version, model name, and Ollama health.
 ### Stop the Daemon
 
 ```bash
-crabby stop
+crabby terminate
 ```
 
 Gracefully shuts down the daemon.
@@ -123,7 +126,8 @@ crabby --port 9000 "Hello!"
 | `crabby "message"` | Send a one-shot message |
 | `crabby daemon` | Start the daemon server |
 | `crabby status` | Check daemon and Ollama status |
-| `crabby stop` | Stop the running daemon |
+| `crabby terminate` | Stop the running daemon |
+| `crabby tools` | List loaded external tools |
 
 ## Customization
 
@@ -136,6 +140,27 @@ Crabby uses templates stored in `~/.crabby/` to customize the AI's behavior:
 | `~/.crabby/settings.json` | Tool permissions and allowlist |
 
 Templates are created automatically on first run. Edit them to personalize the assistant, then restart the daemon to apply changes.
+
+## External Tools
+
+Crabby can integrate with external CLI tools. Define tools in `~/.crabby/tools/<name>/<name>.yaml`:
+
+```yaml
+name: mytool
+description: "Description of what the tool does"
+when_to_use: "When the user asks about X"
+
+access:
+  type: shell
+  command: mytool
+
+check:
+  command: "mytool --version"
+```
+
+When the agent first uses an external tool, it automatically discovers available subcommands by calling `--help` and uses that information to construct correct commands.
+
+Use `crabby tools` or `/tools` in chat to see loaded tools and their status.
 
 ## Development
 
