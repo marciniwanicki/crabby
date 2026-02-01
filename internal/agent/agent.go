@@ -116,6 +116,12 @@ type RunOptions struct {
 func (a *Agent) Run(ctx context.Context, userMessage string, opts RunOptions, eventChan chan<- Event) ([]Message, error) {
 	defer close(eventChan)
 
+	a.logger.Debug().
+		Str("user_message", userMessage).
+		Int("history_len", len(opts.History)).
+		Bool("has_context", opts.Context != "").
+		Msg("starting agent run")
+
 	// Build system prompt, optionally with context
 	systemPrompt := a.systemPrompt
 	if opts.Context != "" {
@@ -135,7 +141,13 @@ func (a *Agent) Run(ctx context.Context, userMessage string, opts RunOptions, ev
 		toolDefs[i] = def
 	}
 
+	a.logger.Debug().
+		Int("tool_count", len(toolDefs)).
+		Int("message_count", len(messages)).
+		Msg("prepared for LLM call")
+
 	for i := 0; i < maxToolIterations; i++ {
+		a.logger.Debug().Int("iteration", i+1).Msg("starting iteration")
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -169,6 +181,10 @@ func (a *Agent) Run(ctx context.Context, userMessage string, opts RunOptions, ev
 		case result := <-resultChan:
 			// If no tool calls, this is the final answer - stream buffered content
 			if len(result.ToolCalls) == 0 {
+				a.logger.Debug().
+					Int("tokens", len(bufferedTokens)).
+					Int("content_len", len(result.Content)).
+					Msg("streaming final answer")
 				for _, token := range bufferedTokens {
 					eventChan <- Event{
 						Type: EventText,
@@ -178,6 +194,7 @@ func (a *Agent) Run(ctx context.Context, userMessage string, opts RunOptions, ev
 				}
 				// Add final assistant message and return history (excluding system prompt)
 				messages = append(messages, Message{Role: "assistant", Content: result.Content})
+				a.logger.Debug().Int("final_history_len", len(messages)-1).Msg("agent run complete")
 				return messages[1:], nil // Skip system prompt
 			}
 

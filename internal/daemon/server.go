@@ -23,18 +23,27 @@ const Version = "0.1.0"
 
 // Server represents the daemon server
 type Server struct {
-	port     int
-	ollama   *OllamaClient
-	handler  *Handler
-	settings *config.Settings
-	logger   zerolog.Logger
-	upgrader websocket.Upgrader
-	quit     chan os.Signal
+	port      int
+	ollama    *OllamaClient
+	handler   *Handler
+	settings  *config.Settings
+	logger    zerolog.Logger
+	logCloser io.Closer
+	upgrader  websocket.Upgrader
+	quit      chan os.Signal
 }
 
 // NewServer creates a new daemon server
 func NewServer(port int, ollamaURL, model string) *Server {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	// Set up rolling file logger
+	logCfg := config.DefaultLogConfig()
+	logger, logCloser, err := config.SetupLogger(logCfg)
+	if err != nil {
+		// Fall back to stdout-only logging
+		logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+		logger.Warn().Err(err).Msg("failed to set up file logging, using stdout only")
+		logCloser = nil
+	}
 
 	// Load settings
 	settings, err := config.Load()
@@ -117,11 +126,12 @@ func NewServer(port int, ollamaURL, model string) *Server {
 	handler := NewHandler(agnt, logger)
 
 	return &Server{
-		port:     port,
-		ollama:   ollama,
-		handler:  handler,
-		settings: settings,
-		logger:   logger,
+		port:      port,
+		ollama:    ollama,
+		handler:   handler,
+		settings:  settings,
+		logger:    logger,
+		logCloser: logCloser,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Allow local connections
@@ -179,6 +189,12 @@ func (s *Server) Run() error {
 
 	<-done
 	s.logger.Info().Msg("server stopped")
+
+	// Close log file
+	if s.logCloser != nil {
+		_ = s.logCloser.Close()
+	}
+
 	return nil
 }
 

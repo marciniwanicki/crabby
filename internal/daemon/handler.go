@@ -100,14 +100,21 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 		Context: h.context,
 	}
 
+	h.logger.Debug().
+		Int("history_len", len(h.history)).
+		Bool("has_context", h.context != "").
+		Msg("starting chat processing")
+
 	resultChan := make(chan []agent.Message, 1)
 	errChan := make(chan error, 1)
 	go func() {
 		history, err := h.agent.Run(ctx, message, opts, eventChan)
 		if err != nil {
+			h.logger.Error().Err(err).Msg("agent run failed")
 			errChan <- err
 			return
 		}
+		h.logger.Debug().Int("new_history_len", len(history)).Msg("agent run completed")
 		resultChan <- history
 	}()
 
@@ -121,6 +128,10 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 			if event.Role == agent.RoleSystem {
 				role = api.Role_SYSTEM
 			}
+			h.logger.Debug().
+				Str("type", "text").
+				Int("len", len(event.Text)).
+				Msg("streaming event")
 			resp = &api.ChatResponse{
 				Payload: &api.ChatResponse_Text{
 					Text: &api.TextChunk{
@@ -131,6 +142,11 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 			}
 
 		case agent.EventToolCall:
+			h.logger.Debug().
+				Str("type", "tool_call").
+				Str("tool", event.ToolName).
+				Str("id", event.ToolID).
+				Msg("streaming event")
 			resp = &api.ChatResponse{
 				Payload: &api.ChatResponse_ToolCall{
 					ToolCall: &api.ToolCall{
@@ -142,6 +158,12 @@ func (h *Handler) processChat(conn *websocket.Conn, message string) error {
 			}
 
 		case agent.EventToolResult:
+			h.logger.Debug().
+				Str("type", "tool_result").
+				Str("tool", event.ToolName).
+				Bool("success", event.ToolSuccess).
+				Int("output_len", len(event.ToolOutput)).
+				Msg("streaming event")
 			resp = &api.ChatResponse{
 				Payload: &api.ChatResponse_ToolResult{
 					ToolResult: &api.ToolResult{
